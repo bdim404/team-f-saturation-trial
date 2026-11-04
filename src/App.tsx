@@ -103,33 +103,39 @@ function VersionButton({ slot, label, active, disabled, onSelect }: { slot: Slot
 function Toolbar({ lang, setLang, theme, setTheme, t }: { lang: Lang; setLang: (l: Lang) => void; theme: Theme; setTheme: (t: Theme) => void; t: Messages }) {
   const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor
   return (
-    <div className="flex items-center justify-end gap-2">
-      <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
-        <SelectTrigger size="sm" aria-label={t.language} className="gap-2">
-          <Globe className="size-4 text-muted-foreground" />
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent align="end">
-          {(Object.keys(LANGUAGES) as Lang[]).map((l) => (
-            <SelectItem key={l} value={l} lang={l}>{LANGUAGES[l]}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="size-8" aria-label={t.theme}>
-            <ThemeIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{t.theme}</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={theme} onValueChange={(v) => setTheme(v as Theme)}>
-            <DropdownMenuRadioItem value="light"><Sun /> {t.light}</DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="dark"><Moon /> {t.dark}</DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="system"><Monitor /> {t.system}</DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <div className="flex items-center justify-between gap-3">
+      <a href="https://www.upf.edu" target="_blank" rel="noreferrer" className="shrink-0">
+        <img src={`${import.meta.env.BASE_URL}upf-rgb.png`} alt="Universitat Pompeu Fabra" className="h-8 w-auto sm:h-9 dark:hidden" />
+        <img src={`${import.meta.env.BASE_URL}upf-white.png`} alt="Universitat Pompeu Fabra" className="hidden h-8 w-auto sm:h-9 dark:block" />
+      </a>
+      <div className="flex items-center gap-2">
+        <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
+          <SelectTrigger size="sm" aria-label={t.language} className="gap-2">
+            <Globe className="size-4 text-muted-foreground" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            {(Object.keys(LANGUAGES) as Lang[]).map((l) => (
+              <SelectItem key={l} value={l} lang={l}>{LANGUAGES[l]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="size-8" aria-label={t.theme}>
+              <ThemeIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>{t.theme}</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={theme} onValueChange={(v) => setTheme(v as Theme)}>
+              <DropdownMenuRadioItem value="light"><Sun /> {t.light}</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="dark"><Moon /> {t.dark}</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="system"><Monitor /> {t.system}</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   )
 }
