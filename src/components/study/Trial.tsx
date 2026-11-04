@@ -41,7 +41,7 @@ function RankOrder({ id, question, hint, value, onChange, disabled, clearLabel }
     <fieldset className="flex flex-col gap-3" disabled={disabled} aria-describedby={`${id}-hint`}>
       <legend className="mb-1 font-serif text-lg leading-snug font-medium text-balance">{question}</legend>
       <p id={`${id}-hint`} className="-mt-1 text-sm text-muted-foreground">{hint}</p>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {SLOTS.map((k) => {
           const pos = value.indexOf(k)
           return (
@@ -51,7 +51,7 @@ function RankOrder({ id, question, hint, value, onChange, disabled, clearLabel }
               onClick={() => pick(k)}
               aria-pressed={pos >= 0}
               className={cn(
-                "flex h-12 min-w-24 items-center justify-center gap-2 rounded-xl border-2 px-4 text-base font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+                "flex h-12 items-center justify-center gap-2 rounded-xl border-2 px-2 text-base font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
                 pos >= 0 ? "border-primary bg-accent" : "border-border hover:bg-accent/60",
               )}
             >
@@ -62,12 +62,12 @@ function RankOrder({ id, question, hint, value, onChange, disabled, clearLabel }
             </button>
           )
         })}
-        {value.length > 0 && (
-          <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])}>
-            <RotateCcw /> {clearLabel}
-          </Button>
-        )}
       </div>
+      {value.length > 0 && (
+        <Button type="button" variant="ghost" size="sm" className="-mt-1 self-end" onClick={() => onChange([])}>
+          <RotateCcw /> {clearLabel}
+        </Button>
+      )}
     </fieldset>
   )
 }
@@ -178,40 +178,42 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
         <CardDescription className="text-base">{t.trialIntro}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-        <div className="flex items-center gap-4">
-          <Button size="icon" className="size-14 shrink-0 rounded-full" onClick={toggle} aria-label={playing ? t.pause : t.play}>
-            {playing ? <Pause className="size-6 fill-current" /> : <Play className="size-6 translate-x-0.5 fill-current" />}
-          </Button>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <Waveform source={track.waveform} progress={duration ? time / duration : 0} />
-            <div className="flex justify-between font-mono text-xs text-muted-foreground tabular-nums">
-              <span>{fmt(time)}</span>
-              <span>{fmt(duration)}</span>
+        <div className="sticky top-[env(safe-area-inset-top,0px)] z-10 -mx-4 flex flex-col gap-3 border-b bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:static sm:mx-0 sm:gap-6 sm:border-b-0 sm:bg-card sm:p-0 sm:backdrop-blur-none">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Button size="icon" className="size-12 shrink-0 rounded-full sm:size-14" onClick={toggle} aria-label={playing ? t.pause : t.play}>
+              {playing ? <Pause className="size-6 fill-current" /> : <Play className="size-6 translate-x-0.5 fill-current" />}
+            </Button>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Waveform source={track.waveform} progress={duration ? time / duration : 0} />
+              <div className="flex justify-between font-mono text-xs text-muted-foreground tabular-nums">
+                <span>{fmt(time)}</span>
+                <span>{fmt(duration)}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div role="group" aria-label={t.versionGroup} className="grid grid-cols-3 gap-3">
-          {SLOTS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              aria-pressed={active === k}
-              onClick={() => select(k)}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-xl border-2 bg-card px-2 py-5 transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                active === k ? "border-primary bg-accent" : "border-border hover:bg-accent/60",
-              )}
-            >
-              <span className="text-4xl leading-none font-semibold tracking-tight">{k}</span>
-              <span className={cn("text-xs", active === k ? "text-foreground" : "text-muted-foreground")}>
-                {active === k && playing ? t.nowPlaying : fill(t.version, { v: k })}
-              </span>
-            </button>
-          ))}
+          <div role="group" aria-label={t.versionGroup} className="grid grid-cols-3 gap-2 sm:gap-3">
+            {SLOTS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={active === k}
+                onClick={() => select(k)}
+                className={cn(
+                  "flex flex-col items-center gap-1 rounded-xl border-2 bg-card px-2 py-2.5 transition-colors sm:py-5 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  active === k ? "border-primary bg-accent" : "border-border hover:bg-accent/60",
+                )}
+              >
+                <span className="text-3xl leading-none font-semibold tracking-tight sm:text-4xl">{k}</span>
+                <span className={cn("text-xs", active === k ? "text-foreground" : "text-muted-foreground")}>
+                  {active === k && playing ? t.nowPlaying : fill(t.version, { v: k })}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          {t.hintSwitch} <KeyHint t={t} />
+          {t.hintSwitch} <span className="[@media(pointer:coarse)]:hidden"><KeyHint t={t} /></span>
         </p>
 
         <Separator />
@@ -251,7 +253,7 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
         )}
       </CardContent>
       <CardFooter>
-        <Button size="lg" disabled={!complete} onClick={finish}>{index + 1 < total ? t.nextTrack : t.continue}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={!complete} onClick={finish}>{index + 1 < total ? t.nextTrack : t.continue}</Button>
       </CardFooter>
     </Card>
   )

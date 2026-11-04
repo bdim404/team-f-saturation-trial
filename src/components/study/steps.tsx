@@ -76,7 +76,7 @@ export function Welcome({ t, onStart }: { t: Messages; onStart: () => void }) {
         </Label>
       </CardContent>
       <CardFooter>
-        <Button size="lg" disabled={!agreed} onClick={onStart}>{t.start}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={!agreed} onClick={onStart}>{t.start}</Button>
       </CardFooter>
     </Card>
   )
@@ -107,6 +107,7 @@ export function Background({ t, onDone }: { t: Messages; onDone: (p: Omit<Partic
       <CardFooter>
         <Button
           size="lg"
+          className="w-full sm:w-auto"
           disabled={!ok}
           onClick={() =>
             onDone({
@@ -140,7 +141,7 @@ export function Definitions({ t, onDone }: { t: Messages; onDone: () => void }) 
         </dl>
       </CardContent>
       <CardFooter>
-        <Button size="lg" onClick={onDone}>{t.continue}</Button>
+        <Button size="lg" className="w-full sm:w-auto" onClick={onDone}>{t.continue}</Button>
       </CardFooter>
     </Card>
   )
@@ -158,7 +159,7 @@ export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending:
         {failed && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
       </CardContent>
       <CardFooter>
-        <Button size="lg" disabled={sending} onClick={() => onSubmit(genres.trim())}>{sending ? t.sending : t.submit}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={sending} onClick={() => onSubmit(genres.trim())}>{sending ? t.sending : t.submit}</Button>
       </CardFooter>
     </Card>
   )
