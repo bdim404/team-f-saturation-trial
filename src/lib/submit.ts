@@ -3,12 +3,15 @@ import type { Level, Slot } from "@/lib/audio"
 
 export interface TrialResponse {
   trial: string
+  language: string
+  question: string
   stimulus: string
   answer: Slot
   answer_level: Level
   mapping: Record<Slot, { level: Level; drive: number }>
   switches: number
   seconds_heard: Record<Slot, number>
+  consented: string
   started: string
   submitted: string
 }
