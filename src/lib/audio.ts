@@ -1,5 +1,5 @@
 export const SR = 44100
-export const TARGET_LUFS = -20
+const TARGET_LUFS = -20
 
 export type Level = "less" | "more"
 export type Slot = "A" | "B"
@@ -8,15 +8,11 @@ export interface Version {
   buf: AudioBuffer
   gain: number
   drive: number
-  lufs: number
-  crest: number
-  peak: number
 }
 
 export interface Stimuli {
   slots: Record<Slot, Version>
   map: Record<Slot, Level>
-  levels: Record<Level, Version>
   duration: number
 }
 
@@ -155,12 +151,14 @@ export async function synthLoop(): Promise<AudioBuffer> {
   return oc.startRendering()
 }
 
-export async function decodeFile(file: File): Promise<AudioBuffer> {
+export async function loadStimulus(url: string): Promise<AudioBuffer> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Could not load ${url}: ${res.status}`)
   const dc = new OfflineAudioContext(2, SR, SR)
-  return dc.decodeAudioData(await file.arrayBuffer())
+  return dc.decodeAudioData(await res.arrayBuffer())
 }
 
-export function peakOf(buf: AudioBuffer) {
+function peakOf(buf: AudioBuffer) {
   let p = 0
   for (let c = 0; c < buf.numberOfChannels; c++) {
     const d = buf.getChannelData(c)
@@ -170,17 +168,6 @@ export function peakOf(buf: AudioBuffer) {
     }
   }
   return p
-}
-
-function rmsOf(buf: AudioBuffer) {
-  let s = 0
-  let n = 0
-  for (let c = 0; c < buf.numberOfChannels; c++) {
-    const d = buf.getChannelData(c)
-    for (let i = 0; i < d.length; i++) s += d[i] * d[i]
-    n += d.length
-  }
-  return Math.sqrt(s / n)
 }
 
 function saturate(buf: AudioBuffer, drive: number) {
@@ -231,21 +218,12 @@ export async function buildStimuli(source: AudioBuffer, driveLess: number, drive
     gL *= 0.98 / worst
     gH *= 0.98 / worst
   }
-  const make = (buf: AudioBuffer, gain: number, drive: number, raw: number): Version => ({
-    buf,
-    gain,
-    drive,
-    lufs: raw + 20 * Math.log10(gain),
-    crest: 20 * Math.log10(peakOf(buf) / rmsOf(buf)),
-    peak: 20 * Math.log10(peakOf(buf) * gain),
-  })
-  const less = make(low, gL, driveLess, lL)
-  const more = make(high, gH, driveMore, lH)
+  const less: Version = { buf: low, gain: gL, drive: driveLess }
+  const more: Version = { buf: high, gain: gH, drive: driveMore }
   const lessIsA = Math.random() < 0.5
   return {
     slots: { A: lessIsA ? less : more, B: lessIsA ? more : less },
     map: { A: lessIsA ? "less" : "more", B: lessIsA ? "more" : "less" },
-    levels: { less, more },
     duration: source.duration,
   }
 }

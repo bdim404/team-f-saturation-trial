@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Check, ChevronDown, Copy, Headphones, Pause, Play, RotateCcw, Upload } from "lucide-react"
+import { Check, Headphones, Pause, Play } from "lucide-react"
 import { cn } from "cn"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
-import { Slider } from "@/components/ui/slider"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { buildStimuli, decodeFile, peakOf, Player, synthLoop, TARGET_LUFS, type Level, type Slot, type Stimuli } from "@/lib/audio"
-
-const QUESTION = "Which version made you feel a more intense emotion?"
-const MIN_SECONDS = 3
+import { config } from "@/config"
+import { buildStimuli, loadStimulus, Player, synthLoop, type Slot, type Stimuli } from "@/lib/audio"
+import { submitResponse } from "@/lib/submit"
 
 const fmt = (s: number) => {
   const v = Math.max(0, s)
@@ -21,9 +16,7 @@ const fmt = (s: number) => {
 }
 
 function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd className="rounded border border-b-2 bg-muted px-1.5 font-mono text-[11px] text-foreground">{children}</kbd>
-  )
+  return <kbd className="rounded border border-b-2 bg-muted px-1.5 font-mono text-[11px] text-foreground">{children}</kbd>
 }
 
 function Waveform({ source, progress }: { source: AudioBuffer | null; progress: number }) {
@@ -35,14 +28,14 @@ function Waveform({ source, progress }: { source: AudioBuffer | null; progress: 
     const d = source.getChannelData(0)
     const n = 160
     const step = Math.floor(d.length / n)
-    const pk = peakOf(source) || 1
     const out: number[] = []
     for (let b = 0; b < n; b++) {
       let m = 0
       for (let i = b * step; i < (b + 1) * step; i += 8) m = Math.max(m, Math.abs(d[i]))
-      out.push(m / pk)
+      out.push(m)
     }
-    bars.current = out
+    const pk = Math.max(...out) || 1
+    bars.current = out.map((v) => v / pk)
   }, [source])
 
   useEffect(() => {
@@ -54,13 +47,12 @@ function Waveform({ source, progress }: { source: AudioBuffer | null; progress: 
     cv.width = w * dpr
     cv.height = h * dpr
     const g = cv.getContext("2d")
-    if (!g) return
+    const n = bars.current.length
+    if (!g || !n) return
     g.scale(dpr, dpr)
     const cs = getComputedStyle(cv)
     const on = cs.getPropertyValue("--wave-on")
     const off = cs.getPropertyValue("--wave-off")
-    const n = bars.current.length
-    if (!n) return
     const bw = w / n
     bars.current.forEach((v, i) => {
       const bh = Math.max(2, v * (h - 4))
@@ -94,64 +86,46 @@ function VersionButton({ slot, active, playing, disabled, onSelect }: { slot: Sl
   )
 }
 
-interface TrialRecord {
-  trial: string
-  question: string
-  stimulus: string
-  answer: Slot
-  answer_is: string
-  mapping: Record<Slot, { level: Level; drive: number }>
-  switches: number
-  seconds_heard: Record<Slot, number>
-  started: string
-  submitted: string
-}
+type Phase = "loading" | "error" | "trial" | "sending" | "done"
 
 export default function App() {
   const [source, setSource] = useState<AudioBuffer | null>(null)
-  const [sourceName, setSourceName] = useState("synth-pop-loop")
-  const [drives, setDrives] = useState({ less: 0, more: 4 })
   const [stim, setStim] = useState<Stimuli | null>(null)
-  const [status, setStatus] = useState("Preparing audio…")
+  const [phase, setPhase] = useState<Phase>("loading")
+  const [error, setError] = useState("")
   const [playing, setPlaying] = useState(false)
   const [active, setActive] = useState<Slot>("A")
   const [time, setTime] = useState(0)
   const [heard, setHeard] = useState<Record<Slot, number>>({ A: 0, B: 0 })
   const [answer, setAnswer] = useState<Slot | "">("")
-  const [record, setRecord] = useState<TrialRecord | null>(null)
-  const [copied, setCopied] = useState(false)
   const player = useRef<Player | null>(null)
   const started = useRef(new Date().toISOString())
-  const fileInput = useRef<HTMLInputElement>(null)
-
-  const rebuild = useCallback(async (src: AudioBuffer, less: number, more: number) => {
-    setStatus("Preparing audio…")
-    player.current?.dispose()
-    player.current = null
-    setStim(null)
-    const s = await buildStimuli(src, less, more)
-    player.current = new Player(s)
-    started.current = new Date().toISOString()
-    setStim(s)
-    setPlaying(false)
-    setActive("A")
-    setTime(0)
-    setHeard({ A: 0, B: 0 })
-    setAnswer("")
-    setRecord(null)
-    setCopied(false)
-    setStatus("Ready")
-  }, [])
 
   useEffect(() => {
-    synthLoop()
-      .then((b) => {
+    let cancelled = false
+    const load = config.stimulusUrl ? loadStimulus(config.stimulusUrl) : synthLoop()
+    load
+      .then(async (b) => {
+        const s = await buildStimuli(b, config.drive.less, config.drive.more)
+        if (cancelled) return
+        player.current?.dispose()
+        player.current = new Player(s)
+        started.current = new Date().toISOString()
         setSource(b)
-        return rebuild(b, 0, 4)
+        setStim(s)
+        setPhase("trial")
       })
-      .catch(() => setStatus("This browser could not build the audio."))
-    return () => player.current?.dispose()
-  }, [rebuild])
+      .catch(() => {
+        if (cancelled) return
+        setError("The audio could not be loaded. Please reload the page.")
+        setPhase("error")
+      })
+    return () => {
+      cancelled = true
+      player.current?.dispose()
+      player.current = null
+    }
+  }, [])
 
   useEffect(() => {
     if (!playing) return
@@ -176,11 +150,9 @@ export default function App() {
       setTime(p.time())
       setHeard({ ...p.heard })
       setPlaying(false)
-      setStatus("Paused")
     } else {
       p.play()
       setPlaying(true)
-      setStatus(`Playing ${p.active}`)
     }
   }, [])
 
@@ -190,13 +162,12 @@ export default function App() {
     p.select(k)
     setActive(k)
     setHeard({ ...p.heard })
-    if (p.playing) setStatus(`Playing ${k}`)
   }, [])
 
   useEffect(() => {
+    if (phase !== "trial") return
     const onKey = (e: KeyboardEvent) => {
-      if (!stim || record) return
-      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, [role=slider]")) return
+      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, [role=radio]")) return
       if (e.code === "Space") {
         e.preventDefault()
         toggle()
@@ -205,81 +176,64 @@ export default function App() {
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [stim, record, toggle, select])
+  }, [phase, toggle, select])
 
-  const unlocked = heard.A >= MIN_SECONDS && heard.B >= MIN_SECONDS
+  const min = config.minSecondsPerVersion
+  const unlocked = heard.A >= min && heard.B >= min
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const p = player.current
     if (!answer || !stim || !p) return
     p.pause()
     setPlaying(false)
-    setRecord({
-      trial: "saturation-felt-intensity-01",
-      question: QUESTION,
-      stimulus: sourceName,
-      answer,
-      answer_is: `${stim.map[answer]} saturated`,
-      mapping: {
-        A: { level: stim.map.A, drive: stim.slots.A.drive },
-        B: { level: stim.map.B, drive: stim.slots.B.drive },
-      },
-      switches: p.switches,
-      seconds_heard: { A: +p.heard.A.toFixed(1), B: +p.heard.B.toFixed(1) },
-      started: started.current,
-      submitted: new Date().toISOString(),
-    })
-    setStatus("Done")
-  }
-
-  const copy = () => {
-    if (!record) return
-    navigator.clipboard?.writeText(JSON.stringify(record, null, 2)).then(
-      () => setCopied(true),
-      () => setCopied(false),
-    )
-  }
-
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    if (!f) return
-    setStatus("Decoding file…")
+    setPhase("sending")
     try {
-      const b = await decodeFile(f)
-      setSource(b)
-      setSourceName(f.name)
-      await rebuild(b, drives.less, drives.more)
+      await submitResponse({
+        trial: config.trialId,
+        stimulus: config.stimulusUrl ?? "synth-pop-loop",
+        answer,
+        answer_level: stim.map[answer],
+        mapping: {
+          A: { level: stim.map.A, drive: stim.slots.A.drive },
+          B: { level: stim.map.B, drive: stim.slots.B.drive },
+        },
+        switches: p.switches,
+        seconds_heard: { A: +p.heard.A.toFixed(1), B: +p.heard.B.toFixed(1) },
+        started: started.current,
+        submitted: new Date().toISOString(),
+      })
+      setPhase("done")
     } catch {
-      setStatus("Could not read that file. Try a WAV or MP3.")
+      setError("Your answer could not be sent. Please check your connection and try again.")
+      setPhase("trial")
     }
   }
 
-  const ready = !!stim
+  const ready = phase === "trial"
   const duration = stim?.duration ?? 0
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-10">
       <header className="flex flex-col gap-3">
-        <Badge variant="outline" className="gap-1.5 font-mono text-[11px] tracking-wider uppercase">
-          <Headphones /> MPC · Team F · Example trial
-        </Badge>
-        <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Listen to both versions</h1>
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Headphones className="size-4" /> Please use headphones
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Listening study</h1>
         <p className="max-w-prose text-muted-foreground">
           You will hear the same piece of music in two versions, A and B. Switch between them as often as you like while it plays, then answer one question.
         </p>
       </header>
 
-      {!record ? (
-        <Card>
+      {phase === "done" ? (
+        <Card aria-live="polite">
           <CardHeader>
-            <CardTitle>Listening trial</CardTitle>
-            <CardDescription className="flex flex-wrap gap-x-3 gap-y-1">
-              <span><span className="font-mono text-foreground">1</span> Press play</span>
-              <span><span className="font-mono text-foreground">2</span> Switch A / B</span>
-              <span><span className="font-mono text-foreground">3</span> Answer</span>
-            </CardDescription>
+            <CardTitle className="flex items-center gap-2"><Check className="size-5" /> Thank you</CardTitle>
+            <CardDescription>Your answer has been recorded. You can close this page now.</CardDescription>
           </CardHeader>
+        </Card>
+      ) : (
+        <Card>
           <CardContent className="flex flex-col gap-6">
             <div className="flex items-center gap-4">
               <Button size="icon" className="size-14 shrink-0 rounded-full" disabled={!ready} onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
@@ -289,7 +243,7 @@ export default function App() {
                 <Waveform source={source} progress={duration ? time / duration : 0} />
                 <div className="flex justify-between font-mono text-xs text-muted-foreground tabular-nums">
                   <span>{fmt(time)}</span>
-                  <span>{status}</span>
+                  {phase === "loading" && <span>Loading audio…</span>}
                   <span>{fmt(duration)}</span>
                 </div>
               </div>
@@ -306,7 +260,7 @@ export default function App() {
             <Separator />
 
             <form onSubmit={submit} className="flex flex-col gap-4">
-              <h2 id="question" className="text-xl font-medium tracking-tight text-balance">{QUESTION}</h2>
+              <h2 id="question" className="text-xl font-medium tracking-tight text-balance">{config.question}</h2>
               <RadioGroup
                 aria-labelledby="question"
                 value={answer}
@@ -331,100 +285,18 @@ export default function App() {
               </RadioGroup>
               {!unlocked && (
                 <p className="text-sm text-muted-foreground">
-                  Listen to both versions for at least {MIN_SECONDS} seconds each to unlock the answer
-                  <span className="font-mono tabular-nums"> (A {Math.min(heard.A, MIN_SECONDS).toFixed(0)}/{MIN_SECONDS} s · B {Math.min(heard.B, MIN_SECONDS).toFixed(0)}/{MIN_SECONDS} s)</span>.
+                  Listen to each version for at least {min} seconds to answer
+                  <span className="font-mono tabular-nums"> (A {Math.min(heard.A, min).toFixed(0)}/{min} s · B {Math.min(heard.B, min).toFixed(0)}/{min} s)</span>.
                 </p>
               )}
-              <Button type="submit" size="lg" className="self-start" disabled={!answer}>
-                Submit answer
+              {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+              <Button type="submit" size="lg" className="self-start" disabled={!answer || phase !== "trial"}>
+                {phase === "sending" ? "Sending…" : "Submit answer"}
               </Button>
             </form>
           </CardContent>
         </Card>
-      ) : (
-        <Card aria-live="polite">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Check className="size-5" /> Thanks, your answer is saved</CardTitle>
-            <CardDescription>This is a demo, so nothing leaves this page. A real survey would send the record below to our server.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <pre className="overflow-x-auto rounded-lg border bg-muted p-3 font-mono text-xs leading-relaxed">{JSON.stringify(record, null, 2)}</pre>
-          </CardContent>
-          <CardFooter className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={copy}><Copy /> {copied ? "Copied" : "Copy record"}</Button>
-            <Button variant="outline" onClick={() => source && rebuild(source, drives.less, drives.more)}><RotateCcw /> Run another trial</Button>
-          </CardFooter>
-        </Card>
       )}
-
-      <Collapsible asChild>
-        <Card className="gap-0 py-0">
-          <CollapsibleTrigger className="group flex w-full items-center justify-between px-6 py-5 text-left font-medium">
-            For the team: stimuli and settings
-            <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="flex flex-col gap-6 pb-6">
-              <p className="text-sm text-muted-foreground">
-                Saturation is a soft-clip curve <span className="font-mono text-foreground">y = tanh(d·x) / tanh(d)</span> applied to the peak-normalised mix; d = 0 means no saturation. Both versions are set to {TARGET_LUFS} LUFS (K-weighted, ITU-R BS.1770 filters, no gating), and which one is A or B is randomised per trial. The default sound is a synthesised pop loop so the demo works offline; load an unmastered mix to try real material.
-              </p>
-
-              {(["less", "more"] as Level[]).map((lv) => (
-                <div key={lv} className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={`drive-${lv}`}>{lv === "less" ? "Less saturated" : "More saturated"}</Label>
-                    <span className="font-mono text-sm text-muted-foreground tabular-nums">d = {drives[lv].toFixed(1)}</span>
-                  </div>
-                  <Slider id={`drive-${lv}`} min={0} max={10} step={0.5} value={[drives[lv]]} onValueChange={([v]) => setDrives((d) => ({ ...d, [lv]: v }))} />
-                </div>
-              ))}
-
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Version</TableHead>
-                      <TableHead className="text-right">Drive d</TableHead>
-                      <TableHead className="text-right">Loudness</TableHead>
-                      <TableHead className="text-right">Crest factor</TableHead>
-                      <TableHead className="text-right">Peak</TableHead>
-                      <TableHead className="text-right">Shown as</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="font-mono tabular-nums">
-                    {stim ? (
-                      (["less", "more"] as Level[]).map((lv) => {
-                        const v = stim.levels[lv]
-                        return (
-                          <TableRow key={lv}>
-                            <TableCell className="font-sans">{lv === "less" ? "Less saturated" : "More saturated"}</TableCell>
-                            <TableCell className="text-right">{v.drive.toFixed(1)}</TableCell>
-                            <TableCell className="text-right">{v.lufs.toFixed(1)} LUFS</TableCell>
-                            <TableCell className="text-right">{v.crest.toFixed(1)} dB</TableCell>
-                            <TableCell className="text-right">{v.peak.toFixed(1)} dBFS</TableCell>
-                            <TableCell className="text-right"><Badge variant="secondary">{stim.map.A === lv ? "A" : "B"}</Badge></TableCell>
-                          </TableRow>
-                        )
-                      })
-                    ) : (
-                      <TableRow><TableCell colSpan={6} className="font-sans text-muted-foreground">Preparing…</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <Button onClick={() => source && rebuild(source, drives.less, drives.more)} disabled={!source}>Rebuild stimuli</Button>
-                <Button variant="outline" onClick={() => fileInput.current?.click()}><Upload /> Use your own mix</Button>
-                <input ref={fileInput} type="file" accept="audio/*" className="hidden" onChange={onFile} />
-                <span className="font-mono text-xs text-muted-foreground">
-                  Source: {sourceName === "synth-pop-loop" ? "synthesised pop loop (8 bars, 112 BPM)" : sourceName}
-                </span>
-              </div>
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
     </main>
   )
 }
