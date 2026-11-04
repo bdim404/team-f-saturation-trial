@@ -219,7 +219,7 @@ export default function App() {
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Headphones className="size-4" /> Please use headphones
         </p>
-        <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Listening study</h1>
+        <h1 className="font-serif text-3xl font-semibold text-balance sm:text-4xl">Listening study</h1>
         <p className="max-w-prose text-muted-foreground">
           You will hear the same piece of music in two versions, A and B. Switch between them as often as you like while it plays, then answer one question.
         </p>
@@ -228,7 +228,7 @@ export default function App() {
       {phase === "done" ? (
         <Card aria-live="polite">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Check className="size-5" /> Thank you</CardTitle>
+            <CardTitle className="flex items-center gap-2 font-serif text-xl"><Check className="size-5" /> Thank you</CardTitle>
             <CardDescription>Your answer has been recorded. You can close this page now.</CardDescription>
           </CardHeader>
         </Card>
@@ -260,7 +260,7 @@ export default function App() {
             <Separator />
 
             <form onSubmit={submit} className="flex flex-col gap-4">
-              <h2 id="question" className="text-xl font-medium tracking-tight text-balance">{config.question}</h2>
+              <h2 id="question" className="font-serif text-xl font-medium text-balance sm:text-2xl">{config.question}</h2>
               <RadioGroup
                 aria-labelledby="question"
                 value={answer}
