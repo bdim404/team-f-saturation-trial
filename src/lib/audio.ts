@@ -1,13 +1,15 @@
 export const SR = 44100
 const TARGET_LUFS = -20
 
-export type Level = "less" | "more"
-export type Slot = "A" | "B"
+export const LEVELS = ["less", "base", "more"] as const
+export const SLOTS = ["A", "B", "C"] as const
+export type Level = (typeof LEVELS)[number]
+export type Slot = (typeof SLOTS)[number]
 
 export interface Version {
   buf: AudioBuffer
   gain: number
-  drive: number
+  drive: number | null
 }
 
 export interface Stimuli {
@@ -207,24 +209,33 @@ async function loudness(buf: AudioBuffer) {
   return -0.691 + 10 * Math.log10(sum || 1e-12)
 }
 
-export async function buildStimuli(source: AudioBuffer, driveLess: number, driveMore: number): Promise<Stimuli> {
-  const low = saturate(source, driveLess)
-  const high = saturate(source, driveMore)
-  const [lL, lH] = await Promise.all([loudness(low), loudness(high)])
-  let gL = Math.pow(10, (TARGET_LUFS - lL) / 20)
-  let gH = Math.pow(10, (TARGET_LUFS - lH) / 20)
-  const worst = Math.max(peakOf(low) * gL, peakOf(high) * gH)
-  if (worst > 0.98) {
-    gL *= 0.98 / worst
-    gH *= 0.98 / worst
+const shuffle = <T,>(a: readonly T[]) => {
+  const out = [...a]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
   }
-  const less: Version = { buf: low, gain: gL, drive: driveLess }
-  const more: Version = { buf: high, gain: gH, drive: driveMore }
-  const lessIsA = Math.random() < 0.5
+  return out
+}
+
+export function saturateAll(source: AudioBuffer, drives: Record<Level, number>) {
+  return Object.fromEntries(LEVELS.map((l) => [l, saturate(source, drives[l])])) as Record<Level, AudioBuffer>
+}
+
+export async function buildStimuli(buffers: Record<Level, AudioBuffer>, drives: Record<Level, number | null>): Promise<Stimuli> {
+  const lufs = await Promise.all(LEVELS.map((l) => loudness(buffers[l])))
+  const gains = lufs.map((v) => Math.pow(10, (TARGET_LUFS - v) / 20))
+  const worst = Math.max(...LEVELS.map((l, i) => peakOf(buffers[l]) * gains[i]))
+  const scale = worst > 0.98 ? 0.98 / worst : 1
+  const versions = Object.fromEntries(
+    LEVELS.map((l, i) => [l, { buf: buffers[l], gain: gains[i] * scale, drive: drives[l] }]),
+  ) as Record<Level, Version>
+  const order = shuffle(LEVELS)
+  const map = Object.fromEntries(SLOTS.map((k, i) => [k, order[i]])) as Record<Slot, Level>
   return {
-    slots: { A: lessIsA ? less : more, B: lessIsA ? more : less },
-    map: { A: lessIsA ? "less" : "more", B: lessIsA ? "more" : "less" },
-    duration: source.duration,
+    slots: Object.fromEntries(SLOTS.map((k) => [k, versions[map[k]]])) as Record<Slot, Version>,
+    map,
+    duration: Math.min(...LEVELS.map((l) => buffers[l].duration)),
   }
 }
 
@@ -236,7 +247,7 @@ export class Player {
   private lastMark: number | null = null
   playing = false
   active: Slot = "A"
-  heard: Record<Slot, number> = { A: 0, B: 0 }
+  heard = Object.fromEntries(SLOTS.map((k) => [k, 0])) as Record<Slot, number>
   switches = 0
   private stim: Stimuli
 
@@ -267,6 +278,7 @@ export class Player {
       const src = ctx.createBufferSource()
       src.buffer = this.stim.slots[k].buf
       src.loop = true
+      src.loopEnd = this.stim.duration
       const match = ctx.createGain()
       match.gain.value = this.stim.slots[k].gain
       const sw = ctx.createGain()
@@ -275,7 +287,7 @@ export class Player {
       src.start(t, this.offset % this.stim.duration)
       return { src, sw }
     }
-    this.nodes = { A: make("A"), B: make("B") }
+    this.nodes = Object.fromEntries(SLOTS.map((k) => [k, make(k)])) as Record<Slot, { src: AudioBufferSourceNode; sw: GainNode }>
     this.startedAt = t
     this.lastMark = t
     this.playing = true
@@ -287,7 +299,7 @@ export class Player {
     this.offset = this.time()
     this.playing = false
     this.lastMark = null
-    for (const k of ["A", "B"] as Slot[]) {
+    for (const k of SLOTS) {
       try {
         this.nodes[k].src.stop()
       } catch {
@@ -304,7 +316,7 @@ export class Player {
     this.switches++
     if (this.playing && this.nodes && this.ctx) {
       const t = this.ctx.currentTime
-      for (const v of ["A", "B"] as Slot[]) {
+      for (const v of SLOTS) {
         const g = this.nodes[v].sw.gain
         g.cancelScheduledValues(t)
         g.setValueAtTime(g.value, t)

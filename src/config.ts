@@ -1,8 +1,16 @@
+import type { Level } from "@/lib/audio"
+
+export interface TrackConfig {
+  id: string
+  source?: string
+  files?: Record<Level, string>
+}
+
 export const config = {
-  trialId: "saturation-felt-intensity-01",
-  stimulusUrl: import.meta.env.VITE_STIMULUS_URL as string | undefined,
+  studyId: "saturation-perceived-emotion-01",
   submitUrl: import.meta.env.VITE_SUBMIT_URL as string | undefined,
-  drive: { less: 0, more: 4 },
+  tracks: [{ id: "synth-pop-loop" }] as TrackConfig[],
+  drive: { less: 0, base: 2, more: 5 } as Record<Level, number>,
   minSecondsPerVersion: 3,
-  durationMinutes: 2,
+  durationMinutes: 7,
 }

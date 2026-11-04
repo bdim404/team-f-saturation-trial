@@ -1,24 +1,36 @@
 import { config } from "@/config"
 import type { Level, Slot } from "@/lib/audio"
 
-export interface TrialResponse {
-  trial: string
-  language: string
-  question: string
-  stimulus: string
-  answer: Slot
-  answer_level: Level
-  mapping: Record<Slot, { level: Level; drive: number }>
+export type Why = "harsher" | "warmer" | "other"
+
+export interface TrialResult {
+  track: string
+  mapping: Record<Slot, { level: Level; drive: number | null }>
+  rank_loudness: Level[]
+  rank_clarity: Level[]
+  rank_emotion: Level[]
+  most_emotional_why: { choice: Why; text?: string }
   switches: number
   seconds_heard: Record<Slot, number>
+}
+
+export interface StudyResponse {
+  study: string
+  language: string
+  participant: {
+    music_background: boolean
+    music_background_type?: string
+    headphones: "in-ear" | "over-ear"
+    genres?: string
+  }
+  trials: TrialResult[]
   consented: string
-  started: string
   submitted: string
 }
 
-export async function submitResponse(response: TrialResponse) {
+export async function submitResponse(response: StudyResponse) {
   if (!config.submitUrl) {
-    console.info("trial response", response)
+    console.info("study response", response)
     return
   }
   const res = await fetch(config.submitUrl, {
