@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Section } from "@/components/study/shared"
 import type { Measure } from "@/lib/study-measurements"
 import type { Notice } from "@/lib/study-api"
-import type { Messages } from "@/i18n"
+import { fill, type Messages } from "@/i18n"
 import type { StudyResponse } from "@/lib/submit"
 
 export function ChoiceGroup<T extends string>({ id, label, labelledBy, value, options, onChange, columns = 2, disabled, chips = false }: {
@@ -140,7 +140,7 @@ export function Welcome({ t, onStart, notice, busy, failed, ready = true }: { t:
         <Section title={t.privacyTitle}>
           <p className="text-muted-foreground">{t.privacy}{notice && " " + notice.notice.paragraphs.join(" ")}</p>
         </Section>
-        {failed && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
+        {failed && <p role="alert" className="text-sm text-destructive">{t.entryError}</p>}
         <Separator />
         <Label htmlFor="consent" className="flex cursor-pointer items-start gap-3 text-base leading-snug font-normal">
           <Checkbox id="consent" checked={agreed} onCheckedChange={(v) => setAgreed(v === true)} className="mt-0.5" />
@@ -148,7 +148,7 @@ export function Welcome({ t, onStart, notice, busy, failed, ready = true }: { t:
         </Label>
       </CardContent>
       <CardFooter>
-        <Button size="lg" className="w-full sm:w-auto" disabled={!agreed || busy || !ready} onClick={onStart}>{busy ? t.loading : t.start}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={!agreed || busy || !ready} onClick={onStart}>{busy ? t.starting : t.start}</Button>
       </CardFooter>
     </Card>
   )
@@ -268,7 +268,7 @@ type Genre = "pop" | "rockIndie" | "hiphopRap" | "rnbSoul" | "electronic" | "jaz
 
 const GENRE_ORDER: Genre[] = ["pop", "rockIndie", "hiphopRap", "rnbSoul", "electronic", "jazzBlues", "classical", "latin", "folk", "metal", "singerSongwriter", "soundtrack", "world", "other"]
 
-export function Genres({ t, sending, failed, onSubmit, measure, locked }: { t: Messages; sending: boolean; failed: boolean; onSubmit: (genres: string, other: string) => void; measure?: Measure; locked?: boolean }) {
+export function Genres({ t, sending, failed, onSubmit, measure, locked, rejectedStatus, onReload }: { t: Messages; sending: boolean; failed: boolean; onSubmit: (genres: string, other: string) => void; measure?: Measure; locked?: boolean; rejectedStatus?: number | null; onReload?: () => void }) {
   const [genres, setGenres] = useState<Genre[]>([])
   const [other, setOther] = useState("")
   useEffect(() => {
@@ -322,10 +322,10 @@ export function Genres({ t, sending, failed, onSubmit, measure, locked }: { t: M
             </>
           )}
         </Section>
-        {failed && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
+        {failed && <p role="alert" className="text-sm text-destructive">{rejectedStatus ? fill(t.sendRejected, { status: rejectedStatus }) : t.sendError}</p>}
       </CardContent>
       <CardFooter>
-        <Button size="lg" className="w-full sm:w-auto" disabled={sending || otherMissing} onClick={() => onSubmit(GENRE_ORDER.filter((g) => genres.includes(g)).join(", "), other.trim())}>{sending ? t.sending : t.submit}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={sending || (!rejectedStatus && otherMissing)} onClick={() => rejectedStatus ? onReload?.() : onSubmit(GENRE_ORDER.filter((g) => genres.includes(g)).join(", "), other.trim())}>{sending ? t.sending : rejectedStatus ? t.reload : t.submit}</Button>
       </CardFooter>
     </Card>
   )

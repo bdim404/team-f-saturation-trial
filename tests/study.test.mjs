@@ -200,3 +200,61 @@ test('starting another test uses a distinct identity without deleting the saved 
   assert(await api.restoreReceipt('release-1'))
   assert(!requests.some(r => r.url.includes('export/delete/')))
 })
+
+const { rejectedSubmissionStatus, ApiError } = await load('study-api')
+const { listeningProgress } = await load('study-model')
+test('listening progress does not round up at or below the strict threshold', () => {
+  assert.equal(listeningProgress(2.99, 3), '2.9')
+  assert.equal(listeningProgress(3, 3), '3.0')
+  assert.equal(listeningProgress(3.001, 3), '3+')
+})
+test('4xx recovery is distinct from retryable timeout, throttling and ambiguous failures', () => {
+  for (const status of [400,401,403,404,405,409,413,415,422]) assert.equal(rejectedSubmissionStatus(new ApiError(status)), status)
+  for (const status of [408,429,500,502,503]) assert.equal(rejectedSubmissionStatus(new ApiError(status)), null)
+  assert.equal(rejectedSubmissionStatus(new TypeError('Network lost')), null)
+})
+test('network loss followed by 4xx cannot mutate a potentially saved attempt', async () => {
+  const storage=memory(), bodies=[], keys=[]; let requests=0
+  const api=new StudyAPI('https://api.example.org', storage, async (url,options) => {
+    if (url.endsWith('bootstrap/')) return response({ attempt:'saved',csrf:'csrf',saved:false })
+    if (url.endsWith('responses/')) {
+      bodies.push(options.body);keys.push(options.headers['X-Local-Withdrawal-Key']);requests++
+      if (requests===1) throw new TypeError('Lost acknowledgement')
+      return requests===2 ? response({},400) : response({ saved:true,id:'saved' })
+    }
+    throw new Error('Unexpected request')
+  })
+  await api.bootstrap()
+  await assert.rejects(api.submit({ answers:{why:['felt']} }))
+  await assert.rejects(api.submit({ answers:{why:['softer']} }), error=>error.status===400)
+  await api.submit({ answers:{why:['moreDynamic']} })
+  assert.equal(new Set(bodies).size,1);assert.equal(new Set(keys).size,1)
+  assert.equal(storage.values.size,1)
+})
+test('all languages include entry, recovery and strict-listening copy', async () => {
+  const source=fs.readFileSync(new URL('../src/i18n.ts',import.meta.url),'utf8')
+  const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+  const {messages}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'))
+  assert.equal(Object.keys(messages).length,13)
+  for (const t of Object.values(messages)) {
+    for (const key of ['starting','entryError','sendRejected','reload']) assert(t[key]?.trim())
+    assert.notEqual(t.entryError,t.sendError);assert.notEqual(t.starting,t.loading)
+    assert(t.sendRejected.includes('{status}'));assert(t.unlock.includes('{n}'))
+  }
+})
+
+
+test('a question mounted while hidden accrues no time before its first visible exposure', () => {
+  let clock = 0
+  const data = new Measurements(['why'], () => clock, () => new Date(1700000000000 + clock).toISOString())
+  data.show(['why'], false); clock = 500
+  assert.deepEqual(data.snapshot().timings.why, { firstSeenAt: null, firstAnsweredAt: null, lastAnsweredAt: null, activeMs: 0, elapsedMs: 0, changes: 0 })
+  data.visibility(true); clock = 700; data.answer('why', ['felt'], 'en')
+  data.show([]); data.answer('why', undefined, 'en')
+  const result = data.snapshot()
+  assert.equal(result.timings.why.firstSeenAt, new Date(1700000000500).toISOString())
+  assert.equal(result.timings.why.activeMs, 200)
+  assert.equal(result.timings.why.elapsedMs, 200)
+  assert.equal(result.timings.why.changes, 1)
+  assert.equal(result.answers.why, undefined)
+})

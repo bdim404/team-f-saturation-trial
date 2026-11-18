@@ -18,6 +18,7 @@ export class Measurements {
   private flush() {
     const now = this.now(), elapsed = Math.max(0, now - this.mark)
     for (const id of this.active) {
+      if (!this.timings[id].firstSeenAt) continue // Hidden before first exposure is not a visit.
       this.timings[id].elapsedMs += elapsed
       if (this.visible) this.timings[id].activeMs += elapsed
     }

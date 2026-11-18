@@ -43,3 +43,8 @@ export function addRank(order: Slot[], slot: Slot): Rank {
 export function listeningComplete(p: Protocol, heard: Record<Slot, number>) {
   return !p.questions.some(q => q.audio) || slots.every(s => p.minSecondsPerVersion === 0 || heard[s] > p.minSecondsPerVersion)
 }
+
+/** Do not round incomplete listening up to the threshold. */
+export function listeningProgress(seconds: number, minimum: number) {
+  return seconds > minimum ? `${minimum}+` : (Math.floor(Math.max(0, seconds) * 10) / 10).toFixed(1)
+}

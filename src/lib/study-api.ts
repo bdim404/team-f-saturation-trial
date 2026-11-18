@@ -3,6 +3,10 @@ import type { Instrument, Presentation } from './study-model'
 export type Notice = { release: string; language: string; notice_version: string; csrf: string; synthetic_only: boolean; notice: { title: string; study: string; paragraphs: string[]; acknowledgement: string; start: string }; presentation: Presentation; turnstile: null | { site_key: string; action: string; cdata: string } }
 type Session = { csrf: string; attempt: string; closed: boolean; saved: boolean }
 export class ApiError extends Error { status: number; constructor(status: number) { super(`Study request failed (${status}).`); this.status = status } }
+// 408/429 can be retried; other 4xx need explicit recovery, not a blind replay.
+export function rejectedSubmissionStatus(error: unknown): number | null {
+  return error instanceof ApiError && error.status >= 400 && error.status < 500 && ![408, 429].includes(error.status) ? error.status : null
+}
 export function apiOrigin(value: string, local = false) {
   const url = new URL(value)
   if (url.origin !== value || url.username || url.password || (url.protocol !== 'https:' && !(local && url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname)))) throw new Error('Configure one HTTPS API origin.')
@@ -72,6 +76,8 @@ export class StudyAPI {
     if (result.language !== language) throw new Error('Language change unconfirmed.')
   }
   async submit(payload: object) {
+    // Keep exact bytes even after 4xx: an earlier ambiguous request may have saved.
+    // The UI exposes definitive rejection and offers reload/receipt recovery.
     this.frozen ??= JSON.stringify(payload)
     const result = await (await this.call('responses/', { method: 'POST', headers: { ...this.headers(), 'Content-Type': 'application/json' }, body: this.frozen })).json()
     if (result.saved !== true || result.id !== this.session?.attempt) throw new Error('Saving was not confirmed.')

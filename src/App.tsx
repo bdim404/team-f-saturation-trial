@@ -5,7 +5,7 @@ import { Toolbar } from "@/components/study/shared"
 import { Background, Definitions, Genres, Welcome } from "@/components/study/steps"
 import { Trial } from "@/components/study/Trial"
 import { Button } from "@/components/ui/button"
-import { StudyAPI, deploymentOrigin, type Notice } from "@/lib/study-api"
+import { StudyAPI, deploymentOrigin, rejectedSubmissionStatus, type Notice } from "@/lib/study-api"
 import { canRestartTest, newTestLabel } from "@/lib/staging"
 import { Measurements, type Measure } from "@/lib/study-measurements"
 import { BUNDLE_REVISION, questionIds } from "@/lib/study-bundle"
@@ -26,6 +26,7 @@ export default function App() {
   const [step, setStep] = useState<Step>({ kind: "welcome" })
   const [sending, setSending] = useState(false)
   const [sendFailed, setSendFailed] = useState(false)
+  const [sendRejected, setSendRejected] = useState<number | null>(null)
   const participant = useRef<Omit<StudyResponse["participant"], "genres"> | null>(null)
   const results = useRef<TrialResult[]>([])
   const [api] = useState(() => {
@@ -77,6 +78,7 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
     if (!api) {
+      if (!import.meta.env.DEV) { setEntryFailed(true); return }
       loadTracks().then(ts => !cancelled && setTracks(ts)).catch(() => !cancelled && setLoadFailed(true))
     }
     return () => { cancelled = true }
@@ -120,7 +122,7 @@ export default function App() {
     participant.current = null; results.current = []
     measurements.current = null; instrument.current = null; locked.current = false
     setTracks(null); setNotice(null); setDeleted(false)
-    setLoadFailed(false); setSendFailed(false); setReceiptFailed(false); setEntryFailed(false)
+    setLoadFailed(false); setSendFailed(false); setSendRejected(null); setReceiptFailed(false); setEntryFailed(false)
     go({ kind: 'welcome' })
   }
 
@@ -143,7 +145,7 @@ export default function App() {
   }
 
   const submit = async (_genres: string, _other: string) => {
-    if (sending) return
+    if (sending || sendRejected) return
     setSending(true); setSendFailed(false)
     try {
       const release = instrument.current, data = measurements.current, trial = results.current[0]
@@ -155,7 +157,7 @@ export default function App() {
         switches: trial.switches, submitted: new Date().toISOString() })
       go({ kind: 'done' })
       data.clear(); participant.current = null; results.current = []; setTracks(null)
-    } catch { setSendFailed(true) }
+    } catch (error) { setSendRejected(rejectedSubmissionStatus(error)); setSendFailed(true) }
     finally { setSending(false) }
   }
 
@@ -187,7 +189,7 @@ export default function App() {
           {step.kind === "welcome" && <p className="max-w-prose text-muted-foreground">{t.welcomeLead}</p>}
         </header>
       )}
-      {entryFailed && step.kind !== "welcome" && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
+      {entryFailed && step.kind !== "welcome" && <p role="alert" className="text-sm text-destructive">{t.entryError}</p>}
 
       {step.kind === "welcome" && (
         <Welcome
@@ -195,7 +197,7 @@ export default function App() {
           notice={notice}
           busy={starting}
           failed={entryFailed}
-          ready={!api || !!notice}
+          ready={(!api && import.meta.env.DEV) || !!notice}
           onStart={start}
         />
       )}
@@ -235,7 +237,7 @@ export default function App() {
           </Card>
         ))}
 
-      {step.kind === "genres" && <Genres t={t} sending={sending} failed={sendFailed} onSubmit={submit} measure={measure} locked={locked.current} />}
+      {step.kind === "genres" && <Genres t={t} sending={sending} failed={sendFailed} onSubmit={submit} measure={measure} locked={locked.current} rejectedStatus={sendRejected} onReload={() => window.location.reload()} />}
 
       {step.kind === "done" && (
         <Card aria-live="polite">

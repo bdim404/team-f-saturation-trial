@@ -13,6 +13,7 @@ import { config } from "@/config"
 import { fill, type Messages } from "@/i18n"
 import { Player, SLOTS, type Slot } from "@/lib/audio"
 import type { TrialResult, Why } from "@/lib/submit"
+import { listeningProgress } from "@/lib/study-model"
 import type { Measure } from "@/lib/study-measurements"
 import type { LoadedTrack } from "@/lib/tracks"
 
@@ -286,7 +287,7 @@ export function Trial({ t, track, index, total, onDone, measure }: { t: Messages
                 </span>
                 {!unlocked && (
                   <span aria-hidden className="text-[10px] leading-tight text-muted-foreground">
-                    {fill(t.listenedFor, { s: Math.min(heard[k], min).toFixed(0), n: min })}
+                    {fill(t.listenedFor, { s: listeningProgress(heard[k], min), n: min })}
                   </span>
                 )}
               </button>
