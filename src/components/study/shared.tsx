@@ -140,9 +140,8 @@ export function Toolbar({ lang, setLang, theme, setTheme, t }: { lang: Lang; set
   const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor
   return (
     <div className="flex items-center justify-between gap-3">
-      <a href="https://www.upf.edu" target="_blank" rel="noreferrer" className="shrink-0">
-        <img src={`${import.meta.env.BASE_URL}upf-rgb.png`} alt="Universitat Pompeu Fabra" className="h-8 w-auto sm:h-9 dark:hidden" />
-        <img src={`${import.meta.env.BASE_URL}upf-white.png`} alt="Universitat Pompeu Fabra" className="hidden h-8 w-auto sm:h-9 dark:block" />
+      <a href="https://www.upf.edu/web/mtg" target="_blank" rel="noreferrer" className="shrink-0">
+        <img src={`${import.meta.env.BASE_URL}mtg-logo.png`} alt="MTG, Music Technology Group, Universitat Pompeu Fabra" className="h-8 w-auto sm:h-9 dark:brightness-0 dark:invert" />
       </a>
       <div className="flex items-center gap-2">
         <DropdownMenu>
