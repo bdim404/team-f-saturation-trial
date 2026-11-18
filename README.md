@@ -1,6 +1,6 @@
 # Team F Listening Study
 
-Online listening test for the Team F project in Music Perception and Cognition (Universitat Pompeu Fabra). Participants hear each track in three saturation levels at matched loudness, switch between them while the music plays, and rank the versions by loudness, clarity and perceived emotional intensity.
+Online listening test for the Team F project in Music Perception and Cognition (Universitat Pompeu Fabra). Participants hear each track in three saturation levels at matched loudness, switch between them while the music plays, and rate each version from 0 to 5 for loudness, clarity and perceived emotional intensity.
 
 Live site: https://listening.bdim.es
 
@@ -15,7 +15,7 @@ Live site: https://listening.bdim.es
 1. Welcome page with study information and a consent checkbox
 2. Background questions: musical background, headphone type
 3. Definitions of clarity, loudness and perceived emotion
-4. For each track: three versions (A, B, C in random order), each must be heard for at least 3 seconds, then three ranking questions and "why was the most emotional version the most emotional?"
+4. For each track: three versions (A, B, C in random order), each must be heard for at least 3 seconds, then three rating pages (loudness, clarity, emotion), each rating A, B and C from 0 to 5. When one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest), a follow-up asks why.
 5. Optional question about preferred genres, then submit
 
 The interface is available in English (default), Spanish, Catalan, French, German, Italian, Portuguese, Dutch, Polish, Swedish, Greek, Turkish and Chinese, with light, dark and system themes. Add `?lang=es` (or any other code) to a link to open it in that language.
@@ -40,7 +40,6 @@ Study settings live in `src/config.ts`:
 | `tracks` | The stimuli. Each track is either `{ id, source }` (one unmastered mix; the site renders the three versions with a tanh soft clipper using `drive`) or `{ id, files: { less, base, more } }` (three pre-rendered versions). Paths are relative to `public/`. With no `source` or `files`, a synthesised pop loop is used. |
 | `drive` | Soft-clip drive `d` for each level in `y = tanh(d·x) / tanh(d)`; `0` means no saturation. |
 | `minSecondsPerVersion` | How long each version must be heard before the questions unlock. |
-| `durationMinutes` | Duration shown on the welcome page. |
 
 All versions of a track are loudness-matched to −20 LUFS (K-weighted, ITU-R BS.1770 filters, no gating) in the browser before playback.
 
@@ -65,10 +64,12 @@ Each submission is one JSON object:
     {
       "track": "synth-pop-loop",
       "mapping": { "A": { "level": "more", "drive": 5 }, "B": { "level": "base", "drive": 2 }, "C": { "level": "less", "drive": 0 } },
-      "rank_loudness": ["less", "more", "base"],
-      "rank_clarity": ["base", "more", "less"],
-      "rank_emotion": ["more", "less", "base"],
-      "most_emotional_why": { "choice": "other", "text": "more punch" },
+      "ratings": {
+        "loudness": { "A": 4, "B": 3, "C": 1 },
+        "clarity": { "A": 2, "B": 3, "C": 5 },
+        "emotion": { "A": 3, "B": 5, "C": 4 }
+      },
+      "why": { "kind": "most", "version": "B", "choice": "harsher" },
       "switches": 2,
       "seconds_heard": { "A": 8.3, "B": 3.3, "C": 4.8 }
     }
@@ -78,7 +79,7 @@ Each submission is one JSON object:
 }
 ```
 
-Rankings are stored as saturation levels, most to least, so they can be analysed without the random A/B/C mapping.
+Ratings are 0–5 for each version. `why` is only recorded when one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest); `kind` is `most` or `least` and `version` names the version asked about, so the answer can be read without the random A/B/C mapping. When all three emotion ratings are equal, or both the top and the bottom are tied, no `why` is recorded.
 
 ## Structure
 

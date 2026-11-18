@@ -1,15 +1,22 @@
 import { config } from "@/config"
 import type { Level, Slot } from "@/lib/audio"
 
-export type Why = "harsher" | "warmer" | "other"
+export type Why = "harsher" | "softer" | "moreDynamic" | "lessDynamic" | "memories" | "felt" | "other"
 
 export interface TrialResult {
   track: string
   mapping: Record<Slot, { level: Level; drive: number | null }>
-  rank_loudness: Level[]
-  rank_clarity: Level[]
-  rank_emotion: Level[]
-  most_emotional_why: { choice: Why; text?: string }
+  ratings: {
+    loudness: Record<Slot, number>
+    clarity: Record<Slot, number>
+    emotion: Record<Slot, number>
+  }
+  why?: {
+    kind: "most" | "least"
+    version: Slot
+    choice: Why
+    text?: string
+  }
   switches: number
   seconds_heard: Record<Slot, number>
 }
