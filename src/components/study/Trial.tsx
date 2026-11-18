@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { ChoiceGroup } from "@/components/study/steps"
-import { KeyHint, Waveform } from "@/components/study/shared"
+import { KeyHint, TermInfo, Waveform } from "@/components/study/shared"
 import { config } from "@/config"
 import { fill, type Messages } from "@/i18n"
 import { Player, SLOTS, type Slot } from "@/lib/audio"
@@ -23,7 +23,7 @@ const zero = () => Object.fromEntries(SLOTS.map((k) => [k, 0])) as Record<Slot, 
 
 function RankOrder({ id, question, hint, value, onChange, disabled, clearLabel }: {
   id: string
-  question: string
+  question: React.ReactNode
   hint: string
   value: Slot[]
   onChange: React.Dispatch<React.SetStateAction<Slot[]>>
@@ -38,8 +38,8 @@ function RankOrder({ id, question, hint, value, onChange, disabled, clearLabel }
       return next
     })
   return (
-    <fieldset className="flex flex-col gap-3" disabled={disabled} aria-describedby={`${id}-hint`}>
-      <legend className="mb-1 font-serif text-lg leading-snug font-medium text-balance">{question}</legend>
+    <div role="group" aria-labelledby={`${id}-q`} aria-describedby={`${id}-hint`} className="flex flex-col gap-3">
+      <h3 id={`${id}-q`} className="mb-1 font-serif text-lg leading-snug font-medium text-balance">{question}</h3>
       <p id={`${id}-hint`} className="-mt-1 text-sm text-muted-foreground">{hint}</p>
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {SLOTS.map((k) => {
@@ -48,6 +48,7 @@ function RankOrder({ id, question, hint, value, onChange, disabled, clearLabel }
             <button
               key={k}
               type="button"
+              disabled={disabled}
               onClick={() => pick(k)}
               aria-pressed={pos >= 0}
               className={cn(
@@ -68,7 +69,7 @@ function RankOrder({ id, question, hint, value, onChange, disabled, clearLabel }
           <RotateCcw /> {clearLabel}
         </Button>
       )}
-    </fieldset>
+    </div>
   )
 }
 
@@ -208,6 +209,9 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
                 <span className={cn("text-xs", active === k ? "text-foreground" : "text-muted-foreground")}>
                   {active === k && playing ? t.nowPlaying : fill(t.version, { v: k })}
                 </span>
+                <span aria-hidden className="text-[10px] leading-tight text-muted-foreground">
+                  {fill(t.listenedFor, { s: Math.min(heard[k], min).toFixed(0), n: min })}
+                </span>
               </button>
             ))}
           </div>
@@ -219,15 +223,12 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
         <Separator />
 
         {!unlocked && (
-          <p className="text-sm text-muted-foreground">
-            {fill(t.unlock, { n: min })}
-            <span className="font-mono tabular-nums"> ({SLOTS.map((k) => `${k} ${Math.min(heard[k], min).toFixed(0)}/${min}`).join(" · ")})</span>
-          </p>
+          <p className="text-sm text-muted-foreground">{fill(t.unlock, { n: min })}</p>
         )}
 
-        <RankOrder id="loud" question={t.loudQ} hint={t.loudHint} value={loud} onChange={setLoud} disabled={!unlocked} clearLabel={t.clear} />
-        <RankOrder id="clear" question={t.clearQ} hint={t.clearHint} value={clear} onChange={setClear} disabled={!unlocked} clearLabel={t.clear} />
-        <RankOrder id="emo" question={t.emoQ} hint={t.emoHint} value={emo} onChange={setEmo} disabled={!unlocked} clearLabel={t.clear} />
+        <RankOrder id="loud" question={<>{t.loudQ} <TermInfo term={t.loudnessTerm} definition={t.loudnessDef} label={fill(t.termInfo, { term: t.loudnessTerm })} /></>} hint={t.loudHint} value={loud} onChange={setLoud} disabled={!unlocked} clearLabel={t.clear} />
+        <RankOrder id="clear" question={<>{t.clearQ} <TermInfo term={t.clarityTerm} definition={t.clarityDef} label={fill(t.termInfo, { term: t.clarityTerm })} /></>} hint={t.clearHint} value={clear} onChange={setClear} disabled={!unlocked} clearLabel={t.clear} />
+        <RankOrder id="emo" question={<>{t.emoQ} <TermInfo term={t.emotionTerm} definition={t.emotionDef} label={fill(t.termInfo, { term: t.emotionTerm })} /></>} hint={t.emoHint} value={emo} onChange={setEmo} disabled={!unlocked} clearLabel={t.clear} />
 
         {top && (
           <div className="flex flex-col gap-3">

@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useRef } from "react"
-import { ChevronDown, Globe, Monitor, Moon, Sun } from "lucide-react"
+import { Fragment, useEffect, useRef, useState } from "react"
+import { ChevronDown, Globe, Info, Monitor, Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Popover, PopoverArrow, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { LANGUAGES, type Lang, type Messages } from "@/i18n"
 import type { Theme } from "@/theme"
 
@@ -26,6 +27,65 @@ export function Section({ title, children }: { title: string; children: React.Re
       <h2 className="font-serif text-lg font-semibold">{title}</h2>
       {children}
     </section>
+  )
+}
+
+export function TermInfo({ term, definition, label }: { term: string; definition: string; label: string }) {
+  const [open, setOpen] = useState(false)
+  const keyboard = useRef(false)
+  const closeTimer = useRef(0)
+  const keepOpen = () => {
+    window.clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+  const scheduleClose = () => {
+    window.clearTimeout(closeTimer.current)
+    closeTimer.current = window.setTimeout(() => setOpen(false), 150)
+  }
+  useEffect(() => () => window.clearTimeout(closeTimer.current), [])
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="relative ml-1.5 inline-flex size-[18px] translate-y-px items-center justify-center rounded-full border border-border text-muted-foreground transition-colors select-none after:absolute after:-inset-1.5 after:content-[''] hover:border-foreground/40 hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          onPointerEnter={(e) => {
+            if (e.pointerType !== "mouse") return
+            keyboard.current = false
+            keepOpen()
+          }}
+          onPointerLeave={(e) => {
+            if (e.pointerType === "mouse") scheduleClose()
+          }}
+          onPointerDown={() => {
+            keyboard.current = false
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") keyboard.current = true
+          }}
+        >
+          <Info className="size-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        sideOffset={10}
+        className="max-h-[min(22rem,calc(100dvh-4rem))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto p-3"
+        onOpenAutoFocus={(e) => {
+          if (!keyboard.current) e.preventDefault()
+        }}
+        onCloseAutoFocus={(e) => {
+          if (!keyboard.current) e.preventDefault()
+        }}
+        onPointerEnter={keepOpen}
+        onPointerLeave={scheduleClose}
+      >
+        <PopoverArrow width={12} height={6} />
+        <p className="font-serif text-sm font-semibold">{term}</p>
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{definition}</p>
+      </PopoverContent>
+    </Popover>
   )
 }
 
