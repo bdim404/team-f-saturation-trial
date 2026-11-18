@@ -45,7 +45,11 @@ function RatingGroup({ id, question, hint, value, onChange, disabled, t }: {
       {SLOTS.map((k) => (
         <div key={k} className="flex flex-col gap-2">
           <p id={`${id}-${k}`} className="text-sm font-medium">{fill(t.version, { v: k })}</p>
-          <div role="group" aria-labelledby={`${id}-${k}`} className="grid grid-cols-6 gap-2">
+          <div
+            role="group"
+            aria-labelledby={`${id}-${k}`}
+            className={cn("flex gap-1 rounded-2xl bg-muted p-1 transition-opacity", disabled && "opacity-50")}
+          >
             {SCALE.map((n) => (
               <button
                 key={n}
@@ -54,8 +58,10 @@ function RatingGroup({ id, question, hint, value, onChange, disabled, t }: {
                 aria-pressed={value[k] === n}
                 onClick={() => onChange((prev) => ({ ...prev, [k]: n }))}
                 className={cn(
-                  "flex h-11 items-center justify-center rounded-xl border-2 font-mono text-sm tabular-nums transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-                  value[k] === n ? "border-primary bg-accent text-foreground" : "border-border text-muted-foreground hover:bg-accent/60",
+                  "h-10 flex-1 rounded-xl font-mono text-sm tabular-nums transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed",
+                  value[k] === n
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
                 )}
               >
                 {n}
