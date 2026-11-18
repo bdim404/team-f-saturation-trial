@@ -77,13 +77,15 @@ export default function App() {
   const total = config.tracks.length
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-2xl flex-col gap-5 pt-[max(1.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] sm:gap-6 sm:py-10">
+    <main className="mx-auto flex min-h-svh max-w-2xl flex-col gap-5 pt-[max(1.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] sm:gap-6 sm:py-8">
       <Toolbar lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} t={t} />
 
-      <header className="flex flex-col gap-3">
-        <h1 className="font-serif text-3xl font-semibold text-balance sm:text-4xl">{t.title}</h1>
-        {step.kind === "welcome" && <p className="max-w-prose text-muted-foreground">{t.welcomeLead}</p>}
-      </header>
+      {step.kind !== "trial" && (
+        <header className="flex flex-col gap-3">
+          <h1 className="font-serif text-3xl font-semibold text-balance sm:text-4xl">{t.title}</h1>
+          {step.kind === "welcome" && <p className="max-w-prose text-muted-foreground">{t.welcomeLead}</p>}
+        </header>
+      )}
 
       {step.kind === "welcome" && (
         <Welcome
