@@ -242,8 +242,10 @@ type Genre = "pop" | "rockIndie" | "hiphopRap" | "rnbSoul" | "electronic" | "jaz
 
 const GENRE_ORDER: Genre[] = ["pop", "rockIndie", "hiphopRap", "rnbSoul", "electronic", "jazzBlues", "classical", "latin", "folk", "metal", "singerSongwriter", "soundtrack", "world", "other"]
 
-export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending: boolean; failed: boolean; onSubmit: (genres: string) => void }) {
+export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending: boolean; failed: boolean; onSubmit: (genres: string, other: string) => void }) {
   const [genres, setGenres] = useState<Genre[]>([])
+  const [other, setOther] = useState("")
+  const otherMissing = genres.includes("other") && other.trim() === ""
   return (
     <Card>
       <CardContent className="flex flex-col gap-4">
@@ -271,11 +273,27 @@ export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending:
               { value: "other", label: t.genreOther },
             ]}
           />
+          {genres.includes("other") && (
+            <>
+              <Input
+                id="genres-other"
+                aria-label={t.genreOtherPh}
+                aria-describedby={otherMissing ? "genres-other-hint" : undefined}
+                placeholder={t.genreOtherPh}
+                required
+                value={other}
+                onChange={(e) => setOther(e.target.value)}
+              />
+              {otherMissing && (
+                <p id="genres-other-hint" className="text-xs text-muted-foreground">{t.genreOtherRequired}</p>
+              )}
+            </>
+          )}
         </Section>
         {failed && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
       </CardContent>
       <CardFooter>
-        <Button size="lg" className="w-full sm:w-auto" disabled={sending} onClick={() => onSubmit(GENRE_ORDER.filter((g) => genres.includes(g)).join(", "))}>{sending ? t.sending : t.submit}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={sending || otherMissing} onClick={() => onSubmit(GENRE_ORDER.filter((g) => genres.includes(g)).join(", "), other.trim())}>{sending ? t.sending : t.submit}</Button>
       </CardFooter>
     </Card>
   )

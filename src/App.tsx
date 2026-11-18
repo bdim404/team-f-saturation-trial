@@ -53,7 +53,7 @@ export default function App() {
     }
   }, [])
 
-  const submit = async (genres: string) => {
+  const submit = async (genres: string, genresOther: string) => {
     if (!participant.current) return
     setSending(true)
     setSendFailed(false)
@@ -61,7 +61,7 @@ export default function App() {
       await submitResponse({
         study: config.studyId,
         language: lang,
-        participant: { ...participant.current, ...(genres ? { genres } : {}) },
+        participant: { ...participant.current, ...(genres ? { genres } : {}), ...(genresOther ? { genres_other: genresOther } : {}) },
         trials: results.current,
         consented: consented.current,
         submitted: new Date().toISOString(),
