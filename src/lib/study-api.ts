@@ -8,6 +8,10 @@ export function apiOrigin(value: string, local = false) {
   if (url.origin !== value || url.username || url.password || (url.protocol !== 'https:' && !(local && url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname)))) throw new Error('Configure one HTTPS API origin.')
   return url.origin
 }
+export function deploymentOrigin(value: string, currentOrigin: string, development = false) {
+  // Explicit same-origin mode also permits an HTTP loopback-only Docker test.
+  return value === 'same-origin' ? apiOrigin(currentOrigin, true) : apiOrigin(value, development)
+}
 export class StudyAPI {
   private session: Session | null = null
   private frozen: string | null = null

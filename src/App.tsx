@@ -5,7 +5,7 @@ import { Toolbar } from "@/components/study/shared"
 import { Background, Definitions, Genres, Welcome } from "@/components/study/steps"
 import { Trial } from "@/components/study/Trial"
 import { Button } from "@/components/ui/button"
-import { StudyAPI, apiOrigin, type Notice } from "@/lib/study-api"
+import { StudyAPI, deploymentOrigin, type Notice } from "@/lib/study-api"
 import { Measurements, type Measure } from "@/lib/study-measurements"
 import { BUNDLE_REVISION, questionIds } from "@/lib/study-bundle"
 import type { Instrument } from "@/lib/study-model"
@@ -29,7 +29,7 @@ export default function App() {
   const results = useRef<TrialResult[]>([])
   const [api] = useState(() => {
     const origin = import.meta.env.VITE_API_ORIGIN
-    return origin ? new StudyAPI(apiOrigin(origin, import.meta.env.DEV), sessionStorage) : null
+    return origin ? new StudyAPI(deploymentOrigin(origin, window.location.origin, import.meta.env.DEV), sessionStorage) : null
   })
   const [notice, setNotice] = useState<Notice | null>(null)
   const [starting, setStarting] = useState(false)

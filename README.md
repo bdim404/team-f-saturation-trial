@@ -5,7 +5,7 @@ Online listening test for the Team F project in Music Perception and Cognition (
 Live site: https://listening.bdim.es
 
 > [!IMPORTANT]
-> **Pushing to `main` deploys to production.** The repository is connected to Cloudflare Pages, so every push to `main` is built and published to https://listening.bdim.es within a minute or two. Pushes to other branches get a preview URL on `*.team-f-saturation-trial.pages.dev`. Use a branch for anything you are not ready to show participants.
+> **Pushing to `main` deploys to production.** The Cloudflare Pages project only builds the production branch, so every push to `main` is built and published to https://listening.bdim.es within a minute or two. Other branches and pull requests are not deployed; build and check a change locally with `pnpm build && pnpm preview` before merging.
 
 > [!WARNING]
 > **This branch is a synthetic integration candidate.** The configured API handles consent, session assignment, validation and storage. Without an API origin and matching immutable release, saving fails closed. Answers are never printed to the console. Do not recruit participants or change the production deployment until the backend, origins, consent and stimuli have been reviewed.
@@ -47,7 +47,7 @@ Environment variables (set them in the Cloudflare Pages project for production, 
 
 | Variable | Purpose |
 |---|---|
-| `VITE_API_ORIGIN` | Exact HTTPS API origin, without a path or trailing slash. Loopback HTTP is allowed only in development. |
+| `VITE_API_ORIGIN` | Exact HTTPS API origin, or `same-origin` for the configured Pages gateway. Loopback HTTP is allowed only in development. |
 | `VITE_STUDY_RELEASE` | Immutable synthetic release UUID matching `BUNDLE_REVISION`. |
 
 Text for every language is in `src/i18n.ts`. The translations have not been checked by native speakers yet.
@@ -127,3 +127,26 @@ src/
   components/study/       welcome, background, definitions, trial and genre steps
   components/ui/          shadcn/ui components
 ```
+
+
+## Same-origin Pages gateway (synthetic testing)
+
+`functions/integration/team-f/[[path]].js` forwards only participant API routes to
+`https://api.soundandmusic.eu`. Set the build value `VITE_API_ORIGIN=same-origin`
+and the matching `VITE_STUDY_RELEASE`. Runtime Pages bindings are
+`MPC_GATEWAY_ENABLED=synthetic` and `MPC_FRONTEND_ORIGIN` set to the exact
+frontend HTTPS origin. The backend must allow that same frontend origin.
+The gateway fails closed without these exact settings. No backend credentials belong
+in React or `VITE_*` variables. The API service must use its separate API-only URL
+configuration and `__Host-mpc_api_*` cookies.
+
+Only study cookies, CSRF and submission/withdrawal headers are forwarded. Request size
+is bounded, redirects are rejected, and no caching, storage, payload logs or retries
+are added. Admin routes never pass through this gateway. Static assets remain static.
+Cloudflare now processes the proxied request in transit; PostgreSQL remains the system
+of record. Review this changed data flow and deployed settings before activation.
+
+Run `node --test tests/study.test.mjs tests/gateway.test.mjs` and verify the deployed
+Pages/HTTPS save, retry, receipt and withdrawal flow before enabling any environment.
+A local HTTP Docker test alone cannot validate the deployed gateway.
+The production Pages branch remains main; publishing dev does not activate this code.

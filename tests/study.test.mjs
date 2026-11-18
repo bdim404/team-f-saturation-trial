@@ -5,7 +5,7 @@ import { webcrypto } from 'node:crypto'
 import ts from 'typescript'
 globalThis.crypto ??= webcrypto
 const load = async name => import('data:text/javascript;base64,' + Buffer.from(ts.transpileModule(fs.readFileSync(new URL('../src/lib/' + name + '.ts', import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText).toString('base64'))
-const { StudyAPI, apiOrigin } = await load('study-api')
+const { StudyAPI, apiOrigin, deploymentOrigin } = await load('study-api')
 const { addRank, applicable, changeAnswer, listeningComplete } = await load('study-model')
 const { Player } = await load('audio')
 const response = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -132,4 +132,12 @@ test('receipt recovery distinguishes missing session from transport or server fa
     if (status === 403) assert.equal(await api.restoreReceipt('release-1'), null)
     else await assert.rejects(api.restoreReceipt('release-1'), error => error.status === status)
   }
+})
+
+test('same-origin deployment is explicit and allows HTTP only on loopback', () => {
+  assert.equal(deploymentOrigin('same-origin','https://listening.example.org'),'https://listening.example.org')
+  assert.equal(deploymentOrigin('same-origin','http://localhost:5178'),'http://localhost:5178')
+  assert.throws(() => deploymentOrigin('same-origin','http://public.example.org'))
+  assert.throws(() => deploymentOrigin('http://localhost:8357','https://listening.example.org'))
+  assert.equal(deploymentOrigin('https://api.example.org','https://listening.example.org'),'https://api.example.org')
 })
