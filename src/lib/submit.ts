@@ -1,4 +1,3 @@
-import { config } from "@/config"
 import type { Level, Slot } from "@/lib/audio"
 
 export type Why = "harsher" | "softer" | "moreDynamic" | "lessDynamic" | "memories" | "felt" | "other"
@@ -35,17 +34,4 @@ export interface StudyResponse {
   trials: TrialResult[]
   consented: string
   submitted: string
-}
-
-export async function submitResponse(response: StudyResponse) {
-  if (!config.submitUrl) {
-    console.info("study response", response)
-    return
-  }
-  const res = await fetch(config.submitUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(response),
-  })
-  if (!res.ok) throw new Error(`Submit failed: ${res.status}`)
 }

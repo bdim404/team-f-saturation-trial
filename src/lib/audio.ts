@@ -257,14 +257,16 @@ export class Player {
 
   time() {
     if (!this.playing || !this.ctx) return this.offset
-    return (this.offset + this.ctx.currentTime - this.startedAt) % this.stim.duration
+    return (this.offset + Math.max(0, this.ctx.currentTime - this.startedAt)) % this.stim.duration
   }
 
   tally() {
     if (this.playing && this.ctx && this.lastMark !== null) {
       const t = this.ctx.currentTime
-      this.heard[this.active] += t - this.lastMark
-      this.lastMark = t
+      if (t > this.lastMark) {
+        this.heard[this.active] += t - this.lastMark
+        this.lastMark = t
+      }
     }
   }
 

@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react"
 import { Check } from "lucide-react"
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Toolbar } from "@/components/study/shared"
 import { Background, Definitions, Genres, Welcome } from "@/components/study/steps"
 import { Trial } from "@/components/study/Trial"
+import { Button } from "@/components/ui/button"
+import { StudyAPI, apiOrigin, type Notice } from "@/lib/study-api"
+import { Measurements, type Measure } from "@/lib/study-measurements"
+import { BUNDLE_REVISION, questionIds } from "@/lib/study-bundle"
+import type { Instrument } from "@/lib/study-model"
 import { config } from "@/config"
 import { initialLang, messages, saveLang, type Lang } from "@/i18n"
-import { submitResponse, type StudyResponse, type TrialResult } from "@/lib/submit"
+import { type StudyResponse, type TrialResult } from "@/lib/submit"
 import { loadTracks, type LoadedTrack } from "@/lib/tracks"
 import { saveTheme, storedTheme, type Theme } from "@/theme"
 
@@ -22,18 +27,41 @@ export default function App() {
   const [sendFailed, setSendFailed] = useState(false)
   const participant = useRef<Omit<StudyResponse["participant"], "genres"> | null>(null)
   const results = useRef<TrialResult[]>([])
-  const consented = useRef("")
+  const [api] = useState(() => {
+    const origin = import.meta.env.VITE_API_ORIGIN
+    return origin ? new StudyAPI(apiOrigin(origin, import.meta.env.DEV), sessionStorage) : null
+  })
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const [starting, setStarting] = useState(false)
+  const [entryFailed, setEntryFailed] = useState(false)
+  const [receiptFailed, setReceiptFailed] = useState(false)
+  const [deleted, setDeleted] = useState(false)
+  const instrument = useRef<Instrument | null>(null)
+  const measurements = useRef<Measurements | null>(null)
+  const currentLang = useRef(lang)
+  const locked = useRef(false)
+  const [measure] = useState<Measure>(() => ({
+    show: ids => measurements.current?.show(ids, document.visibilityState === 'visible'),
+    answer: (id, value) => { if (!locked.current) measurements.current?.answer(id, value, currentLang.current) },
+  }))
   const t = messages[lang]
 
-  const setLang = (l: Lang) => {
-    setLangState(l)
-    saveLang(l)
+  const setLang = async (l: Lang) => {
+    if (starting || sending || locked.current || step.kind === 'done') return
+    try {
+      setStarting(true)
+      if (api && instrument.current) await api.language(l)
+      currentLang.current = l; setLangState(l); saveLang(l)
+      if (api && instrument.current) instrument.current = await api.protocol()
+    } catch { setEntryFailed(true) }
+    finally { setStarting(false) }
   }
   const setTheme = (v: Theme) => {
     setThemeState(v)
     saveTheme(v)
   }
   const go = (s: Step) => {
+    measure.show([])
     setStep(s)
     window.scrollTo({ top: 0 })
   }
@@ -45,33 +73,90 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false
-    loadTracks()
-      .then((ts) => !cancelled && setTracks(ts))
-      .catch(() => !cancelled && setLoadFailed(true))
-    return () => {
-      cancelled = true
+    if (!api) {
+      loadTracks().then(ts => !cancelled && setTracks(ts)).catch(() => !cancelled && setLoadFailed(true))
     }
+    return () => { cancelled = true }
+  }, [api])
+
+  useEffect(() => {
+    if (!api || step.kind !== 'welcome') return
+    let cancelled = false
+    setNotice(null); setEntryFailed(false)
+    const release = import.meta.env.VITE_STUDY_RELEASE
+    if (!release) { setEntryFailed(true); return }
+    const prepare = async () => {
+      const saved = await api.restoreReceipt(release)
+      if (cancelled) return
+      if (saved) {
+        if (!Object.prototype.hasOwnProperty.call(messages, saved.language)) throw new Error('Unsupported receipt language.')
+        instrument.current = saved; locked.current = true
+        currentLang.current = saved.language as Lang
+        setLangState(saved.language as Lang); setStep({ kind: 'done' })
+        return
+      }
+      const value = await api.notice(lang, release)
+      if (!value.synthetic_only || value.turnstile) throw new Error('Unsupported collection configuration.')
+      if (!cancelled) setNotice(value)
+    }
+    prepare().catch(() => !cancelled && setEntryFailed(true))
+    return () => { cancelled = true }
+  }, [api, lang, step.kind])
+
+  useEffect(() => {
+    const visibility = () => measurements.current?.visibility(document.visibilityState === 'visible')
+    document.addEventListener('visibilitychange', visibility)
+    return () => document.removeEventListener('visibilitychange', visibility)
   }, [])
 
-  const submit = async (genres: string, genresOther: string) => {
-    if (!participant.current) return
-    setSending(true)
-    setSendFailed(false)
+  const start = async () => {
+    if (starting || (api && (!notice || notice.language !== lang))) return
+    setStarting(true); setEntryFailed(false)
     try {
-      await submitResponse({
-        study: config.studyId,
-        language: lang,
-        participant: { ...participant.current, ...(genres ? { genres } : {}), ...(genresOther ? { genres_other: genresOther } : {}) },
-        trials: results.current,
-        consented: consented.current,
-        submitted: new Date().toISOString(),
-      })
-      go({ kind: "done" })
-    } catch {
-      setSendFailed(true)
-    } finally {
-      setSending(false)
-    }
+      if (api && notice) {
+        await api.start(notice, '')
+        const value = await api.protocol()
+        if (value.protocol.study_revision !== BUNDLE_REVISION || config.tracks.length !== 1 || value.protocol.bundled_frontend?.track !== config.tracks[0].id || value.protocol.audio.mode !== 'synthetic' || value.protocol.minSecondsPerVersion !== config.minSecondsPerVersion || JSON.stringify(value.protocol.questions.map(q => q.id)) !== JSON.stringify(questionIds)) throw new Error('Questionnaire release mismatch.')
+        instrument.current = value
+        measurements.current = new Measurements(questionIds)
+        setTracks(await loadTracks(value.mapping))
+      }
+      go({ kind: 'background' })
+    } catch { setEntryFailed(true) }
+    finally { setStarting(false) }
+  }
+
+  const submit = async (_genres: string, _other: string) => {
+    if (sending) return
+    setSending(true); setSendFailed(false)
+    try {
+      const release = instrument.current, data = measurements.current, trial = results.current[0]
+      if (!api || !release || !data || !trial) throw new Error('Collection is not configured.')
+      if (!locked.current) await api.language(currentLang.current)
+      locked.current = true
+      await api.submit({ schema_version: 2, release: release.protocol.release, language: currentLang.current,
+        ...data.snapshot(), mapping: release.mapping, seconds_heard: trial.seconds_heard,
+        switches: trial.switches, submitted: new Date().toISOString() })
+      go({ kind: 'done' })
+      data.clear(); participant.current = null; results.current = []; setTracks(null)
+    } catch { setSendFailed(true) }
+    finally { setSending(false) }
+  }
+
+  const download = async (format: 'json' | 'csv') => {
+    if (!api) return
+    setReceiptFailed(false)
+    try {
+      const url = URL.createObjectURL(await api.receipt(format))
+      const link = document.createElement('a'); link.href = url; link.download = `study-receipt.${format}`; link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch { setReceiptFailed(true) }
+  }
+  const withdraw = async () => {
+    const copy = instrument.current?.presentation.deletion
+    if (!api || !copy || !window.confirm(copy.body)) return
+    try { await api.withdraw(); setDeleted(true); setReceiptFailed(false) }
+    catch { setReceiptFailed(true) }
   }
 
   const total = config.tracks.length
@@ -84,20 +169,23 @@ export default function App() {
         <h1 className="font-serif text-3xl font-semibold text-balance sm:text-4xl">{t.title}</h1>
         {step.kind === "welcome" && <p className="max-w-prose text-muted-foreground">{t.welcomeLead}</p>}
       </header>
+      {entryFailed && step.kind !== "welcome" && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
 
       {step.kind === "welcome" && (
         <Welcome
           t={t}
-          onStart={() => {
-            consented.current = new Date().toISOString()
-            go({ kind: "background" })
-          }}
+          notice={notice}
+          busy={starting}
+          failed={entryFailed}
+          ready={!api || !!notice}
+          onStart={start}
         />
       )}
 
       {step.kind === "background" && (
         <Background
           t={t}
+          measure={measure}
           onDone={(p) => {
             participant.current = p
             go({ kind: "definitions" })
@@ -113,6 +201,7 @@ export default function App() {
             key={step.index}
             t={t}
             track={tracks[step.index]}
+            measure={measure}
             index={step.index}
             total={total}
             onDone={(r) => {
@@ -128,14 +217,20 @@ export default function App() {
           </Card>
         ))}
 
-      {step.kind === "genres" && <Genres t={t} sending={sending} failed={sendFailed} onSubmit={submit} />}
+      {step.kind === "genres" && <Genres t={t} sending={sending} failed={sendFailed} onSubmit={submit} measure={measure} locked={locked.current} />}
 
       {step.kind === "done" && (
         <Card aria-live="polite">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-serif text-xl"><Check className="size-5" /> {t.thanksTitle}</CardTitle>
-            <CardDescription>{t.thanksBody}</CardDescription>
+            <CardDescription>{deleted ? instrument.current?.presentation.status[2] : t.thanksBody}</CardDescription>
           </CardHeader>
+          {api && !deleted && <CardContent className="flex flex-wrap gap-3">
+            <Button variant="outline" onClick={() => download('json')}>{instrument.current?.presentation.receipt[2]}</Button>
+            <Button variant="outline" onClick={() => download('csv')}>{instrument.current?.presentation.receipt[3]}</Button>
+            <Button variant="outline" onClick={withdraw}>{instrument.current?.presentation.deletion.confirm}</Button>
+            {receiptFailed && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
+          </CardContent>}
         </Card>
       )}
 

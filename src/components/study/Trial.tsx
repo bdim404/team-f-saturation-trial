@@ -13,6 +13,7 @@ import { config } from "@/config"
 import { fill, type Messages } from "@/i18n"
 import { Player, SLOTS, type Slot } from "@/lib/audio"
 import type { TrialResult, Why } from "@/lib/submit"
+import type { Measure } from "@/lib/study-measurements"
 import type { LoadedTrack } from "@/lib/tracks"
 
 const fmt = (s: number) => {
@@ -70,7 +71,7 @@ function RatingGroup({ id, question, hint, value, onChange, disabled, t }: {
   )
 }
 
-export function Trial({ t, track, index, total, onDone }: { t: Messages; track: LoadedTrack; index: number; total: number; onDone: (r: TrialResult) => void }) {
+export function Trial({ t, track, index, total, onDone, measure }: { t: Messages; track: LoadedTrack; index: number; total: number; onDone: (r: TrialResult) => void; measure?: Measure }) {
   const player = useRef<Player | null>(null)
   const [playing, setPlaying] = useState(false)
   const [active, setActive] = useState<Slot>("A")
@@ -144,8 +145,20 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
     return () => document.removeEventListener("keydown", onKey)
   }, [toggle, select])
 
+  useEffect(() => {
+    const pauseHidden = () => {
+      if (document.visibilityState !== 'visible') {
+        const p = player.current
+        p?.pause(); setPlaying(false)
+        if (p) { setTime(p.time()); setHeard({ ...p.heard }) }
+      }
+    }
+    document.addEventListener('visibilitychange', pauseHidden)
+    return () => document.removeEventListener('visibilitychange', pauseHidden)
+  }, [])
+
   const min = config.minSecondsPerVersion
-  const unlocked = SLOTS.every((k) => heard[k] >= min)
+  const unlocked = SLOTS.every((k) => heard[k] > min)
 
   const emotionRated = allRated(emotion)
   const values = SLOTS.map((k) => emotion[k] ?? 0)
@@ -164,7 +177,19 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
   useEffect(() => {
     setWhy("")
     setWhyText("")
+    measure?.answer("why", undefined)
+    measure?.answer("why_other", undefined)
   }, [target?.kind, target?.slot])
+
+  useEffect(() => {
+    const dimension = ['loudness','clarity','emotion'][page]
+    measure?.show(page < 3 ? SLOTS.map(s => `${dimension}_${s}`) : target ? ['why', ...(why === 'other' ? ['why_other'] : [])] : [])
+    for (const [d, ratings] of Object.entries({ loudness: loud, clarity, emotion })) {
+      for (const slot of SLOTS) measure?.answer(`${d}_${slot}`, ratings[slot] === null ? undefined : String(ratings[slot]))
+    }
+    measure?.answer('why', target && why ? why : undefined)
+    measure?.answer('why_other', target && why === 'other' && whyText.trim() ? whyText.trim() : undefined)
+  }, [page, unlocked, loud, clarity, emotion, target?.kind, target?.slot, why, whyText, measure])
 
   const ratedSteps = [allRated(loud), allRated(clarity), allRated(emotion)]
   const whyAnswered = !target || (why !== "" && (why !== "other" || whyText.trim() !== ""))
@@ -195,7 +220,7 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
       ratings: { loudness: records(loud), clarity: records(clarity), emotion: records(emotion) },
       ...(target ? { why: { kind: target.kind, version: target.slot, choice: why as Why, ...(why === "other" ? { text: whyText.trim() } : {}) } } : {}),
       switches: p.switches,
-      seconds_heard: Object.fromEntries(SLOTS.map((k) => [k, +p.heard[k].toFixed(1)])) as Record<Slot, number>,
+      seconds_heard: Object.fromEntries(SLOTS.map((k) => [k, p.heard[k]])) as Record<Slot, number>,
     })
   }
 

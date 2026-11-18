@@ -8,14 +8,14 @@ Live site: https://listening.bdim.es
 > **Pushing to `main` deploys to production.** The repository is connected to Cloudflare Pages, so every push to `main` is built and published to https://listening.bdim.es within a minute or two. Pushes to other branches get a preview URL on `*.team-f-saturation-trial.pages.dev`. Use a branch for anything you are not ready to show participants.
 
 > [!WARNING]
-> **There is no backend yet, so responses are not stored.** When a participant submits, the response is only printed to the browser console (`study response`) and then discarded. Do not share the link with real participants until `VITE_SUBMIT_URL` points to a server that saves the data.
+> **This branch is a synthetic integration candidate.** The configured API handles consent, session assignment, validation and storage. Without an API origin and matching immutable release, saving fails closed. Answers are never printed to the console. Do not recruit participants or change the production deployment until the backend, origins, consent and stimuli have been reviewed.
 
 ## Study flow
 
 1. Welcome page with study information and a consent checkbox
 2. Background questions: musical background, headphone type
 3. Definitions of clarity, loudness and perceived emotion
-4. For each track: three versions (A, B, C in random order), each must be heard for at least 3 seconds, then three rating pages (loudness, clarity, emotion), each rating A, B and C from 0 to 5. When one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest), a follow-up asks why.
+4. For each track: three versions (A, B, C in random order), each must be heard for more than 3 seconds, then three rating pages (loudness, clarity, emotion), each rating A, B and C from 0 to 5. When one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest), a follow-up asks why.
 5. Optional multiple-choice question about preferred genres, then submit
 
 The interface is available in English (default), Spanish, Catalan, French, German, Italian, Portuguese, Dutch, Polish, Swedish, Greek, Turkish and Chinese, with light, dark and system themes. Add `?lang=es` (or any other code) to a link to open it in that language.
@@ -47,13 +47,42 @@ Environment variables (set them in the Cloudflare Pages project for production, 
 
 | Variable | Purpose |
 |---|---|
-| `VITE_SUBMIT_URL` | Endpoint that receives each response as a JSON `POST`. Not set yet, see the warning above. |
+| `VITE_API_ORIGIN` | Exact HTTPS API origin, without a path or trailing slash. Loopback HTTP is allowed only in development. |
+| `VITE_STUDY_RELEASE` | Immutable synthetic release UUID matching `BUNDLE_REVISION`. |
 
 Text for every language is in `src/i18n.ts`. The translations have not been checked by native speakers yet.
 
-## Response format
+## API contract
 
-Each submission is one JSON object:
+The API is under `/integration/team-f/`: versioned `entry/`, `protocol/`, `language/`,
+`responses/` and participant `export/json/`, `export/csv/`, `export/delete/` routes.
+Requests include session cookies and CSRF tokens. The server supplies the A/B/C map.
+Submission retries preserve exact JSON bytes, attempt ID and withdrawal key; success
+requires an acknowledged matching ID. Responses and aggregate timings stay in memory
+and are cleared after confirmed save; only a withdrawal key lives in sessionStorage.
+Reloading loses unsaved answers. A saved receipt is recovered from the backend in
+the same tab while its session and withdrawal key remain available, including after
+a save whose acknowledgement was lost. This does not download answers automatically.
+Theme/language preferences are independent.
+
+The wire format is schema 2: `release`, `language`, `answers`, `answer_languages`,
+`timings`, `mapping`, `seconds_heard`, `switches`, `submitted`. Nine rating question
+IDs (`loudness_A` etc.) use option IDs `0` through `5`; background/genres use arrays of
+option IDs. All 17 timing entries include first seen/answered/last answered timestamps,
+answer changes, visible active time and elapsed time while that question is shown.
+Hidden-tab time is excluded from active time, and hidden tabs pause audio.
+
+`node scripts/export-study-bundle.mjs` exports public question copy and metadata for
+registration in the separate backend. Updating questions requires a matching new
+revision; old releases remain immutable. This candidate supports the one synthetic
+triplet currently in config, despite the intro currently saying two tracks. Final
+stimuli and multi-track collection need a reviewed contract. It does not add telemetry
+or Gold-MSI. `node --test tests/study.test.mjs` checks transport and measurements.
+
+## Internal UI types
+
+The UI components still use these in-memory types. This is **not** the API payload:
+
 
 ```json
 {
@@ -91,7 +120,10 @@ src/
   theme.ts                light / dark / system theme
   lib/audio.ts            synthesis, saturation, loudness matching, synced A/B/C player
   lib/tracks.ts           loads and prepares the configured tracks
-  lib/submit.ts           response types and submission
+  lib/submit.ts           internal UI response types
+  lib/study-api.ts        session, CSRF, idempotent transport and receipts
+  lib/study-bundle.ts     bundled questionnaire revision and public metadata
+  lib/study-measurements.ts aggregate question timings
   components/study/       welcome, background, definitions, trial and genre steps
   components/ui/          shadcn/ui components
 ```
