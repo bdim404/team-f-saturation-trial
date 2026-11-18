@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Pause, Play } from "lucide-react"
+import { Check, Pause, Play } from "lucide-react"
+import { RadioGroup as RadioGroupPrimitive } from "radix-ui"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -45,29 +46,24 @@ function RatingGroup({ id, question, hint, value, onChange, disabled, t }: {
       {SLOTS.map((k) => (
         <div key={k} className="flex flex-col gap-2">
           <p id={`${id}-${k}`} className="text-sm font-medium">{fill(t.version, { v: k })}</p>
-          <div
-            role="group"
+          <RadioGroupPrimitive.Root
+            value={value[k] === null ? undefined : String(value[k])}
+            onValueChange={(v) => onChange((prev) => ({ ...prev, [k]: Number(v) }))}
+            disabled={disabled}
             aria-labelledby={`${id}-${k}`}
             className={cn("flex gap-1 rounded-2xl bg-muted p-1 transition-opacity", disabled && "opacity-50")}
           >
             {SCALE.map((n) => (
-              <button
+              <RadioGroupPrimitive.Item
                 key={n}
-                type="button"
+                value={String(n)}
                 disabled={disabled}
-                aria-pressed={value[k] === n}
-                onClick={() => onChange((prev) => ({ ...prev, [k]: n }))}
-                className={cn(
-                  "h-10 flex-1 rounded-xl font-mono text-sm tabular-nums transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed",
-                  value[k] === n
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
-                )}
+                className="h-11 flex-1 rounded-xl font-mono text-sm tabular-nums text-muted-foreground transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed data-[state=unchecked]:hover:bg-foreground/10 data-[state=unchecked]:hover:text-foreground data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:shadow-sm"
               >
                 {n}
-              </button>
+              </RadioGroupPrimitive.Item>
             ))}
-          </div>
+          </RadioGroupPrimitive.Root>
         </div>
       ))}
     </div>
@@ -135,12 +131,14 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, [role=radio], [role=combobox], [role=menu]")) return
-      const key = e.key.toUpperCase()
+      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, [role=combobox], [role=menu]")) return
       if (e.code === "Space") {
         e.preventDefault()
         toggle()
-      } else if ((SLOTS as readonly string[]).includes(key)) select(key as Slot)
+      } else {
+        const key = e.key.toUpperCase()
+        if ((SLOTS as readonly string[]).includes(key)) select(key as Slot)
+      }
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
@@ -168,6 +166,7 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
     setWhyText("")
   }, [target?.kind, target?.slot])
 
+  const ratedSteps = [allRated(loud), allRated(clarity), allRated(emotion)]
   const whyAnswered = !target || (why !== "" && (why !== "other" || whyText.trim() !== ""))
   const pageDone = unlocked && (page === 0 ? allRated(loud) : page === 1 ? allRated(clarity) : allRated(emotion) && whyAnswered)
   const complete = unlocked && allRated(loud) && allRated(clarity) && allRated(emotion) && whyAnswered
@@ -187,6 +186,12 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
       switches: p.switches,
       seconds_heard: Object.fromEntries(SLOTS.map((k) => [k, +p.heard[k].toFixed(1)])) as Record<Slot, number>,
     })
+  }
+
+  const goTo = (i: number) => {
+    if (!ratedSteps[i]) return
+    setPage(i)
+    window.scrollTo({ top: 0 })
   }
 
   const next = () => {
@@ -250,8 +255,30 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
 
         <Separator />
 
+        <div className="flex flex-wrap items-center gap-1.5">
+          {[t.loudnessTerm, t.clarityTerm, t.emotionTerm].map((label, i) => {
+            const current = i === page
+            const className = cn(
+              "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs leading-none font-medium transition-colors",
+              current ? "bg-primary text-primary-foreground" : ratedSteps[i] ? "text-foreground" : "text-muted-foreground",
+            )
+            return ratedSteps[i] && !current ? (
+              <button key={label} type="button" onClick={() => goTo(i)} className={cn(className, "hover:bg-muted")}>
+                <Check className="size-3" />
+                {label}
+              </button>
+            ) : (
+              <span key={label} className={className} aria-current={current ? "step" : undefined}>
+                <span className="font-mono tabular-nums">{i + 1}</span>
+                {label}
+              </span>
+            )
+          })}
+        </div>
+
         {!unlocked && <p className="text-sm text-muted-foreground">{fill(t.unlock, { n: min })}</p>}
 
+        <div key={page} className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
         {page === 0 && (
           <RatingGroup
             id="loud"
@@ -315,10 +342,11 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
             )}
           </>
         )}
+        </div>
       </CardContent>
       <CardFooter>
         <Button size="lg" className="w-full sm:w-auto" disabled={!pageDone} onClick={next}>
-          {page < 2 ? t.continue : index + 1 < total ? t.nextTrack : t.continue}
+          {page < 2 ? t.nextQuestion : index + 1 < total ? t.nextTrack : t.continue}
         </Button>
       </CardFooter>
     </Card>
