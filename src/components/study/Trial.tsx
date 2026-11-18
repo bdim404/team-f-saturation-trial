@@ -24,16 +24,17 @@ const zero = () => Object.fromEntries(SLOTS.map((k) => [k, 0])) as Record<Slot, 
 
 const SCALE = [0, 1, 2, 3, 4, 5] as const
 
+const TONE = ["text-muted-foreground/40", "text-muted-foreground/55", "text-muted-foreground/70", "text-muted-foreground/85", "text-muted-foreground/95", "text-muted-foreground"] as const
+
 type Ratings = Record<Slot, number | null>
 
 const emptyRatings = (): Ratings => ({ A: null, B: null, C: null })
 
 const allRated = (r: Ratings) => SLOTS.every((k) => r[k] !== null)
 
-function RatingGroup({ id, question, hint, value, onChange, disabled, t }: {
+function RatingGroup({ id, question, value, onChange, disabled, t }: {
   id: string
   question: React.ReactNode
-  hint: string
   value: Ratings
   onChange: React.Dispatch<React.SetStateAction<Ratings>>
   disabled: boolean
@@ -42,7 +43,6 @@ function RatingGroup({ id, question, hint, value, onChange, disabled, t }: {
   return (
     <div role="group" aria-labelledby={`${id}-q`} className="flex flex-col gap-3">
       <h3 id={`${id}-q`} className="font-serif text-lg leading-snug font-medium text-balance">{question}</h3>
-      <p className="-mt-2 text-sm text-muted-foreground">{hint}</p>
       {SLOTS.map((k) => (
         <div key={k} className="flex items-center gap-2 sm:gap-3">
           <p id={`${id}-${k}`} className="w-5 shrink-0 text-sm font-medium sm:w-24">
@@ -54,16 +54,18 @@ function RatingGroup({ id, question, hint, value, onChange, disabled, t }: {
             onValueChange={(v) => onChange((prev) => ({ ...prev, [k]: Number(v) }))}
             disabled={disabled}
             aria-labelledby={`${id}-${k}`}
-            className={cn("flex flex-1 gap-1 rounded-2xl bg-muted p-1 transition-opacity", disabled && "opacity-50")}
+            className={cn("relative flex flex-1 transition-opacity", disabled && "opacity-50")}
           >
+            <span aria-hidden className="pointer-events-none absolute inset-x-[8%] bottom-[9px] h-px bg-gradient-to-r from-border via-foreground/20 to-foreground/55" />
             {SCALE.map((n) => (
               <RadioGroupPrimitive.Item
                 key={n}
                 value={String(n)}
                 disabled={disabled}
-                className="h-10 flex-1 rounded-xl font-mono text-sm tabular-nums text-muted-foreground transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed data-[state=unchecked]:hover:bg-foreground/10 data-[state=unchecked]:hover:text-foreground data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:shadow-sm"
+                className="group relative z-10 flex flex-1 cursor-pointer flex-col items-center gap-2 rounded-lg py-1 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed"
               >
-                {n}
+                <span className={cn("font-mono text-[11px] tabular-nums transition-colors group-hover:text-foreground", value[k] === n ? "font-semibold text-foreground" : TONE[n])}>{n}</span>
+                <span className={cn("size-2.5 rounded-full border-2 transition-colors", value[k] === n ? "border-primary bg-primary" : "border-border bg-card group-hover:border-foreground/40")} />
               </RadioGroupPrimitive.Item>
             ))}
           </RadioGroupPrimitive.Root>
@@ -302,7 +304,6 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
             id="loud"
             t={t}
             question={<>{t.loudQ} <TermInfo term={t.loudnessTerm} definition={t.loudnessDef} label={fill(t.termInfo, { term: t.loudnessTerm })} /></>}
-            hint={t.scaleHint}
             value={loud}
             onChange={setLoud}
             disabled={!unlocked}
@@ -314,7 +315,6 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
             id="clarity"
             t={t}
             question={<>{t.clearQ} <TermInfo term={t.clarityTerm} definition={t.clarityDef} label={fill(t.termInfo, { term: t.clarityTerm })} /></>}
-            hint={t.scaleHint}
             value={clarity}
             onChange={setClarity}
             disabled={!unlocked}
@@ -327,8 +327,7 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
               id="emotion"
               t={t}
               question={<>{t.emoQ} <TermInfo term={t.emotionTerm} definition={t.emotionDef} label={fill(t.termInfo, { term: t.emotionTerm })} /></>}
-              hint={t.scaleHint}
-              value={emotion}
+                value={emotion}
               onChange={setEmotion}
               disabled={!unlocked}
             />
