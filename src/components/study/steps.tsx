@@ -123,7 +123,8 @@ export function Background({ t, onDone }: { t: Messages; onDone: (p: Omit<Partic
   const [musicTypes, setMusicTypes] = useState<MusicBackground[]>([])
   const [musicTypeOther, setMusicTypeOther] = useState("")
   const [phones, setPhones] = useState<Participant["headphones"] | "">("")
-  const ok = music !== "" && phones !== ""
+  const otherMissing = music === "yes" && musicTypes.includes("other") && musicTypeOther.trim() === ""
+  const ok = music !== "" && phones !== "" && !otherMissing
   return (
     <Card>
       <CardContent className="flex flex-col gap-6">
@@ -147,13 +148,20 @@ export function Background({ t, onDone }: { t: Messages; onDone: (p: Omit<Partic
               ]}
             />
             {musicTypes.includes("other") && (
-              <Input
-                id="music-type-other"
-                aria-label={t.bgOtherPh}
-                placeholder={t.bgOtherPh}
-                value={musicTypeOther}
-                onChange={(e) => setMusicTypeOther(e.target.value)}
-              />
+              <>
+                <Input
+                  id="music-type-other"
+                  aria-label={t.bgOtherPh}
+                  aria-describedby={otherMissing ? "music-type-other-hint" : undefined}
+                  placeholder={t.bgOtherPh}
+                  required
+                  value={musicTypeOther}
+                  onChange={(e) => setMusicTypeOther(e.target.value)}
+                />
+                {otherMissing && (
+                  <p id="music-type-other-hint" className="text-xs text-muted-foreground">{t.bgOtherRequired}</p>
+                )}
+              </>
             )}
           </div>
         )}
