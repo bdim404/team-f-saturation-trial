@@ -9,8 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Section } from "@/components/study/shared"
-import { config } from "@/config"
-import { fill, type Messages } from "@/i18n"
+import type { Messages } from "@/i18n"
 import type { StudyResponse } from "@/lib/submit"
 
 export function ChoiceGroup<T extends string>({ id, label, value, options, onChange, columns = 2, disabled }: {
@@ -57,7 +56,7 @@ export function Welcome({ t, onStart }: { t: Messages; onStart: () => void }) {
     <Card>
       <CardContent className="flex flex-col gap-6">
         <Section title={t.whatTitle}>
-          <p className="text-muted-foreground">{fill(t.what, { m: config.durationMinutes })}</p>
+          <p className="text-muted-foreground">{t.what}</p>
         </Section>
         <Section title={t.prepTitle}>
           <ul className="flex list-disc flex-col gap-1.5 pl-5 text-muted-foreground marker:text-border">
