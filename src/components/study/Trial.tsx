@@ -40,25 +40,28 @@ function RatingGroup({ id, question, hint, value, onChange, disabled, t }: {
   t: Messages
 }) {
   return (
-    <div role="group" aria-labelledby={`${id}-q`} className="flex flex-col gap-4">
+    <div role="group" aria-labelledby={`${id}-q`} className="flex flex-col gap-3">
       <h3 id={`${id}-q`} className="font-serif text-lg leading-snug font-medium text-balance">{question}</h3>
       <p className="-mt-2 text-sm text-muted-foreground">{hint}</p>
       {SLOTS.map((k) => (
-        <div key={k} className="flex flex-col gap-2">
-          <p id={`${id}-${k}`} className="text-sm font-medium">{fill(t.version, { v: k })}</p>
+        <div key={k} className="flex items-center gap-2 sm:gap-3">
+          <p id={`${id}-${k}`} className="w-5 shrink-0 text-sm font-medium sm:w-24">
+            <span className="sm:hidden">{k}</span>
+            <span className="hidden sm:inline">{fill(t.version, { v: k })}</span>
+          </p>
           <RadioGroupPrimitive.Root
             value={value[k] === null ? undefined : String(value[k])}
             onValueChange={(v) => onChange((prev) => ({ ...prev, [k]: Number(v) }))}
             disabled={disabled}
             aria-labelledby={`${id}-${k}`}
-            className={cn("flex gap-1 rounded-2xl bg-muted p-1 transition-opacity", disabled && "opacity-50")}
+            className={cn("flex flex-1 gap-1 rounded-2xl bg-muted p-1 transition-opacity", disabled && "opacity-50")}
           >
             {SCALE.map((n) => (
               <RadioGroupPrimitive.Item
                 key={n}
                 value={String(n)}
                 disabled={disabled}
-                className="h-11 flex-1 rounded-xl font-mono text-sm tabular-nums text-muted-foreground transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed data-[state=unchecked]:hover:bg-foreground/10 data-[state=unchecked]:hover:text-foreground data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:shadow-sm"
+                className="h-10 flex-1 rounded-xl font-mono text-sm tabular-nums text-muted-foreground transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed data-[state=unchecked]:hover:bg-foreground/10 data-[state=unchecked]:hover:text-foreground data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:shadow-sm"
               >
                 {n}
               </RadioGroupPrimitive.Item>
@@ -217,12 +220,12 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
   const duration = track.stim.duration
 
   return (
-    <Card>
+    <Card className="gap-4 py-4 sm:gap-4 sm:py-4">
       <CardHeader>
         <CardTitle className="font-mono text-xs font-normal tracking-wider text-muted-foreground uppercase">{fill(t.trackOf, { i: index + 1, n: total })}</CardTitle>
-        <CardDescription className="text-base">{t.trialIntro}</CardDescription>
+        {page === 0 && <CardDescription className="text-sm sm:text-base">{t.trialIntro}</CardDescription>}
       </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+      <CardContent className="flex flex-col gap-3">
         <div className="sticky top-[env(safe-area-inset-top,0px)] z-10 -mx-4 flex flex-col gap-3 border-b bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:static sm:mx-0 sm:gap-6 sm:border-b-0 sm:bg-card sm:p-0 sm:backdrop-blur-none">
           <div className="flex items-center gap-3 sm:gap-4">
             <Button size="icon" className="size-12 shrink-0 rounded-full sm:size-14" onClick={toggle} aria-label={playing ? t.pause : t.play}>
@@ -245,32 +248,36 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
                 aria-pressed={active === k}
                 onClick={() => select(k)}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-xl border-2 bg-card px-2 py-2.5 transition-colors sm:py-5 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  "flex flex-col items-center gap-1 rounded-xl border-2 bg-card px-2 py-2 transition-colors sm:py-3 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                   active === k ? "border-primary bg-accent" : "border-border hover:bg-accent/60",
                 )}
               >
-                <span className="text-3xl leading-none font-semibold tracking-tight sm:text-4xl">{k}</span>
+                <span className="text-2xl leading-none font-semibold tracking-tight sm:text-3xl">{k}</span>
                 <span className={cn("text-xs", active === k ? "text-foreground" : "text-muted-foreground")}>
                   {active === k && playing ? t.nowPlaying : fill(t.version, { v: k })}
                 </span>
-                <span aria-hidden className="text-[10px] leading-tight text-muted-foreground">
-                  {fill(t.listenedFor, { s: Math.min(heard[k], min).toFixed(0), n: min })}
-                </span>
+                {!unlocked && (
+                  <span aria-hidden className="text-[10px] leading-tight text-muted-foreground">
+                    {fill(t.listenedFor, { s: Math.min(heard[k], min).toFixed(0), n: min })}
+                  </span>
+                )}
               </button>
             ))}
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {t.hintSwitch} <span className="[@media(pointer:coarse)]:hidden"><KeyHint t={t} /></span>
-        </p>
+        {page === 0 && (
+          <p className="hidden text-sm text-muted-foreground sm:block">
+            {t.hintSwitch} <KeyHint t={t} />
+          </p>
+        )}
 
         <Separator />
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1">
           {steps.map(({ label, done }, i) => {
             const current = i === page
             const className = cn(
-              "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs leading-none font-medium transition-colors",
+              "flex items-center gap-1 rounded-full px-2 py-1 text-xs leading-none font-medium transition-colors",
               current ? "bg-primary text-primary-foreground" : done ? "text-foreground" : "text-muted-foreground",
             )
             return done && !current ? (
@@ -338,7 +345,7 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
               labelledBy="why-q"
               value={why}
               onChange={setWhy}
-              columns={2}
+              chips
               options={[
                 { value: "harsher", label: t.whyHarsher },
                 { value: "softer", label: t.whySofter },
