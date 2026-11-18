@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Check, Headphones } from "lucide-react"
+import { Check } from "lucide-react"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Toolbar } from "@/components/study/shared"
 import { Background, Definitions, Genres, Welcome } from "@/components/study/steps"
@@ -81,9 +81,6 @@ export default function App() {
       <Toolbar lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} t={t} />
 
       <header className="flex flex-col gap-3">
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Headphones className="size-4" /> {t.headphones}
-        </p>
         <h1 className="font-serif text-3xl font-semibold text-balance sm:text-4xl">{t.title}</h1>
         {step.kind === "welcome" && <p className="max-w-prose text-muted-foreground">{t.welcomeLead}</p>}
       </header>
