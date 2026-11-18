@@ -16,7 +16,7 @@ Live site: https://listening.bdim.es
 2. Background questions: musical background, headphone type
 3. Definitions of clarity, loudness and perceived emotion
 4. For each track: three versions (A, B, C in random order), each must be heard for at least 3 seconds, then three rating pages (loudness, clarity, emotion), each rating A, B and C from 0 to 5. When one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest), a follow-up asks why.
-5. Optional question about preferred genres, then submit
+5. Optional multiple-choice question about preferred genres, then submit
 
 The interface is available in English (default), Spanish, Catalan, French, German, Italian, Portuguese, Dutch, Polish, Swedish, Greek, Turkish and Chinese, with light, dark and system themes. Add `?lang=es` (or any other code) to a link to open it in that language.
 
@@ -59,7 +59,7 @@ Each submission is one JSON object:
 {
   "study": "saturation-perceived-emotion-01",
   "language": "en",
-  "participant": { "music_background": true, "music_background_type": "instrument, other", "music_background_other": "conducting", "headphones": "over-ear", "genres": "jazz, pop" },
+  "participant": { "music_background": true, "music_background_type": "instrument, other", "music_background_other": "conducting", "headphones": "over-ear", "genres": "pop, other", "genres_other": "qawwali" },
   "trials": [
     {
       "track": "synth-pop-loop",
@@ -79,7 +79,7 @@ Each submission is one JSON object:
 }
 ```
 
-Ratings are 0–5 for each version. `why` is only recorded when one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest); `kind` is `most` or `least` and `version` names the version asked about, so the answer can be read without the random A/B/C mapping. When all three emotion ratings are equal, or both the top and the bottom are tied, no `why` is recorded.
+Ratings are 0–5 for each version. `why` is only recorded when one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest); `kind` is `most` or `least` and `version` names the version asked about, so the answer can be read without the random A/B/C mapping. When all three emotion ratings are equal, or both the top and the bottom are tied, no `why` is recorded. Genres are stored as comma-separated ids (`pop`, `rockIndie`, `hiphopRap`, `rnbSoul`, `electronic`, `jazzBlues`, `classical`, `latin`, `folk`, `metal`, `singerSongwriter`, `soundtrack`, `world`, `other`); the field is omitted when nothing is selected.
 
 ## Structure
 
