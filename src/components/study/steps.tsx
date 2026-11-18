@@ -3,7 +3,6 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
@@ -50,6 +49,37 @@ export function ChoiceGroup<T extends string>({ id, label, value, options, onCha
   )
 }
 
+export function CheckGroup<T extends string>({ id, label, value, options, onChange, columns = 2 }: {
+  id: string
+  label: string
+  value: T[]
+  options: { value: T; label: string }[]
+  onChange: (v: T[]) => void
+  columns?: 1 | 2
+}) {
+  const toggle = (v: T) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v])
+  return (
+    <div className="flex flex-col gap-3">
+      <p id={`${id}-label`} className="font-medium">{label}</p>
+      <div role="group" aria-labelledby={`${id}-label`} className={cn("grid gap-3", columns === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+        {options.map((o) => (
+          <Label
+            key={o.value}
+            htmlFor={`${id}-${o.value}`}
+            className={cn(
+              "flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 text-base leading-snug font-normal transition-colors",
+              value.includes(o.value) ? "border-primary bg-accent" : "border-border",
+            )}
+          >
+            <Checkbox id={`${id}-${o.value}`} checked={value.includes(o.value)} onCheckedChange={() => toggle(o.value)} />
+            {o.label}
+          </Label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function Welcome({ t, onStart }: { t: Messages; onStart: () => void }) {
   const [agreed, setAgreed] = useState(false)
   return (
@@ -83,9 +113,13 @@ export function Welcome({ t, onStart }: { t: Messages; onStart: () => void }) {
 
 type Participant = StudyResponse["participant"]
 
+type MusicBackground = "instrument" | "singing" | "production" | "musicStudies"
+
+const MUSIC_BACKGROUND_ORDER: MusicBackground[] = ["instrument", "singing", "production", "musicStudies"]
+
 export function Background({ t, onDone }: { t: Messages; onDone: (p: Omit<Participant, "genres">) => void }) {
   const [music, setMusic] = useState<"yes" | "no" | "">("")
-  const [musicType, setMusicType] = useState("")
+  const [musicTypes, setMusicTypes] = useState<MusicBackground[]>([])
   const [phones, setPhones] = useState<Participant["headphones"] | "">("")
   const ok = music !== "" && phones !== ""
   return (
@@ -96,10 +130,18 @@ export function Background({ t, onDone }: { t: Messages; onDone: (p: Omit<Partic
         </Section>
         <ChoiceGroup id="music" label={t.musicQ} value={music} onChange={setMusic} options={[{ value: "yes", label: t.yes }, { value: "no", label: t.no }]} />
         {music === "yes" && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="music-type" className="text-base font-medium">{t.musicTypeQ}</Label>
-            <Input id="music-type" value={musicType} onChange={(e) => setMusicType(e.target.value)} placeholder={t.musicTypePh} />
-          </div>
+          <CheckGroup
+            id="music-type"
+            label={t.musicTypeQ}
+            value={musicTypes}
+            onChange={setMusicTypes}
+            options={[
+              { value: "instrument", label: t.instrument },
+              { value: "singing", label: t.singing },
+              { value: "production", label: t.production },
+              { value: "musicStudies", label: t.musicStudies },
+            ]}
+          />
         )}
         <ChoiceGroup id="phones" label={t.headphonesQ} value={phones} onChange={setPhones} options={[{ value: "in-ear", label: t.inEar }, { value: "over-ear", label: t.overEar }]} />
       </CardContent>
@@ -111,7 +153,9 @@ export function Background({ t, onDone }: { t: Messages; onDone: (p: Omit<Partic
           onClick={() =>
             onDone({
               music_background: music === "yes",
-              ...(music === "yes" && musicType.trim() ? { music_background_type: musicType.trim() } : {}),
+              ...(music === "yes" && musicTypes.length
+                ? { music_background_type: MUSIC_BACKGROUND_ORDER.filter((v) => musicTypes.includes(v)).join(", ") }
+                : {}),
               headphones: phones as Participant["headphones"],
             })
           }

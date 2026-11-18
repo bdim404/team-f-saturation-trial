@@ -60,7 +60,7 @@ Each submission is one JSON object:
 {
   "study": "saturation-perceived-emotion-01",
   "language": "en",
-  "participant": { "music_background": true, "music_background_type": "guitar", "headphones": "over-ear", "genres": "jazz, pop" },
+  "participant": { "music_background": true, "music_background_type": "instrument, singing", "headphones": "over-ear", "genres": "jazz, pop" },
   "trials": [
     {
       "track": "synth-pop-loop",
