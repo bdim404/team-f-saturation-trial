@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Pause, Play, RotateCcw } from "lucide-react"
+import { Check, Pause, Play } from "lucide-react"
+import { RadioGroup as RadioGroupPrimitive } from "radix-ui"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,54 +22,50 @@ const fmt = (s: number) => {
 
 const zero = () => Object.fromEntries(SLOTS.map((k) => [k, 0])) as Record<Slot, number>
 
-function RankOrder({ id, question, hint, value, onChange, disabled, clearLabel }: {
+const SCALE = [0, 1, 2, 3, 4, 5] as const
+
+type Ratings = Record<Slot, number | null>
+
+const emptyRatings = (): Ratings => ({ A: null, B: null, C: null })
+
+const allRated = (r: Ratings) => SLOTS.every((k) => r[k] !== null)
+
+function RatingGroup({ id, question, hint, value, onChange, disabled, t }: {
   id: string
   question: React.ReactNode
   hint: string
-  value: Slot[]
-  onChange: React.Dispatch<React.SetStateAction<Slot[]>>
+  value: Ratings
+  onChange: React.Dispatch<React.SetStateAction<Ratings>>
   disabled: boolean
-  clearLabel: string
+  t: Messages
 }) {
-  const pick = (k: Slot) =>
-    onChange((prev) => {
-      if (prev.includes(k)) return prev
-      const next = [...prev, k]
-      if (next.length === SLOTS.length - 1) next.push(SLOTS.find((s) => !next.includes(s))!)
-      return next
-    })
   return (
-    <div role="group" aria-labelledby={`${id}-q`} aria-describedby={`${id}-hint`} className="flex flex-col gap-3">
-      <h3 id={`${id}-q`} className="mb-1 font-serif text-lg leading-snug font-medium text-balance">{question}</h3>
-      <p id={`${id}-hint`} className="-mt-1 text-sm text-muted-foreground">{hint}</p>
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        {SLOTS.map((k) => {
-          const pos = value.indexOf(k)
-          return (
-            <button
-              key={k}
-              type="button"
-              disabled={disabled}
-              onClick={() => pick(k)}
-              aria-pressed={pos >= 0}
-              className={cn(
-                "flex h-12 items-center justify-center gap-2 rounded-xl border-2 px-2 text-base font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-                pos >= 0 ? "border-primary bg-accent" : "border-border hover:bg-accent/60",
-              )}
-            >
-              {pos >= 0 && (
-                <span className="flex size-6 items-center justify-center rounded-full bg-primary font-mono text-xs text-primary-foreground tabular-nums">{pos + 1}</span>
-              )}
-              {k}
-            </button>
-          )
-        })}
-      </div>
-      {value.length > 0 && (
-        <Button type="button" variant="ghost" size="sm" className="-mt-1 self-end" onClick={() => onChange([])}>
-          <RotateCcw /> {clearLabel}
-        </Button>
-      )}
+    <div role="group" aria-labelledby={`${id}-q`} className="flex flex-col gap-4">
+      <h3 id={`${id}-q`} className="font-serif text-lg leading-snug font-medium text-balance">{question}</h3>
+      <p className="-mt-2 text-sm text-muted-foreground">{hint}</p>
+      {SLOTS.map((k) => (
+        <div key={k} className="flex flex-col gap-2">
+          <p id={`${id}-${k}`} className="text-sm font-medium">{fill(t.version, { v: k })}</p>
+          <RadioGroupPrimitive.Root
+            value={value[k] === null ? undefined : String(value[k])}
+            onValueChange={(v) => onChange((prev) => ({ ...prev, [k]: Number(v) }))}
+            disabled={disabled}
+            aria-labelledby={`${id}-${k}`}
+            className={cn("flex gap-1 rounded-2xl bg-muted p-1 transition-opacity", disabled && "opacity-50")}
+          >
+            {SCALE.map((n) => (
+              <RadioGroupPrimitive.Item
+                key={n}
+                value={String(n)}
+                disabled={disabled}
+                className="h-11 flex-1 rounded-xl font-mono text-sm tabular-nums text-muted-foreground transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed data-[state=unchecked]:hover:bg-foreground/10 data-[state=unchecked]:hover:text-foreground data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:shadow-sm"
+              >
+                {n}
+              </RadioGroupPrimitive.Item>
+            ))}
+          </RadioGroupPrimitive.Root>
+        </div>
+      ))}
     </div>
   )
 }
@@ -79,9 +76,10 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
   const [active, setActive] = useState<Slot>("A")
   const [time, setTime] = useState(0)
   const [heard, setHeard] = useState(zero)
-  const [loud, setLoud] = useState<Slot[]>([])
-  const [clear, setClear] = useState<Slot[]>([])
-  const [emo, setEmo] = useState<Slot[]>([])
+  const [page, setPage] = useState(0)
+  const [loud, setLoud] = useState<Ratings>(emptyRatings)
+  const [clarity, setClarity] = useState<Ratings>(emptyRatings)
+  const [emotion, setEmotion] = useState<Ratings>(emptyRatings)
   const [why, setWhy] = useState<Why | "">("")
   const [whyText, setWhyText] = useState("")
 
@@ -133,23 +131,56 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, [role=radio], [role=combobox], [role=menu]")) return
-      const key = e.key.toUpperCase()
+      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, [role=combobox], [role=menu]")) return
       if (e.code === "Space") {
         e.preventDefault()
         toggle()
-      } else if ((SLOTS as readonly string[]).includes(key)) select(key as Slot)
+      } else {
+        const key = e.key.toUpperCase()
+        if ((SLOTS as readonly string[]).includes(key)) select(key as Slot)
+      }
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
   }, [toggle, select])
 
-  useEffect(() => setWhy(""), [emo[0]])
-
   const min = config.minSecondsPerVersion
   const unlocked = SLOTS.every((k) => heard[k] >= min)
-  const top = emo[0]
-  const complete = loud.length === 3 && clear.length === 3 && emo.length === 3 && why !== "" && (why !== "other" || whyText.trim() !== "")
+
+  const emotionRated = allRated(emotion)
+  const values = SLOTS.map((k) => emotion[k] ?? 0)
+  const peak = Math.max(...values)
+  const floor = Math.min(...values)
+  const most = SLOTS.filter((k) => emotion[k] === peak)
+  const least = SLOTS.filter((k) => emotion[k] === floor)
+  const target: { kind: "most" | "least"; slot: Slot } | null = !emotionRated
+    ? null
+    : most.length === 1
+      ? { kind: "most", slot: most[0] }
+      : least.length === 1
+        ? { kind: "least", slot: least[0] }
+        : null
+
+  useEffect(() => {
+    setWhy("")
+    setWhyText("")
+  }, [target?.kind, target?.slot])
+
+  const ratedSteps = [allRated(loud), allRated(clarity), allRated(emotion)]
+  const whyAnswered = !target || (why !== "" && (why !== "other" || whyText.trim() !== ""))
+  const lastPage = target ? 3 : 2
+  const pageDone = unlocked && (page === 0 ? ratedSteps[0] : page === 1 ? ratedSteps[1] : page === 2 ? ratedSteps[2] : whyAnswered)
+  const complete = unlocked && ratedSteps[0] && ratedSteps[1] && ratedSteps[2] && whyAnswered
+  const steps = [
+    { label: t.loudnessTerm, done: ratedSteps[0] },
+    { label: t.clarityTerm, done: ratedSteps[1] },
+    { label: t.emotionTerm, done: ratedSteps[2] },
+    ...(target ? [{ label: t.whyStep, done: whyAnswered }] : []),
+  ]
+
+  useEffect(() => {
+    if (page === 3 && !target) setPage(2)
+  }, [page, target])
 
   const finish = () => {
     const p = player.current
@@ -157,17 +188,30 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
     p.pause()
     setPlaying(false)
     const { stim } = track
-    const levels = (order: Slot[]) => order.map((k) => stim.map[k])
+    const records = (r: Ratings) => Object.fromEntries(SLOTS.map((k) => [k, r[k] as number])) as Record<Slot, number>
     onDone({
       track: track.id,
       mapping: Object.fromEntries(SLOTS.map((k) => [k, { level: stim.map[k], drive: stim.slots[k].drive }])) as TrialResult["mapping"],
-      rank_loudness: levels(loud),
-      rank_clarity: levels(clear),
-      rank_emotion: levels(emo),
-      most_emotional_why: why === "other" ? { choice: why, text: whyText.trim() } : { choice: why as Why },
+      ratings: { loudness: records(loud), clarity: records(clarity), emotion: records(emotion) },
+      ...(target ? { why: { kind: target.kind, version: target.slot, choice: why as Why, ...(why === "other" ? { text: whyText.trim() } : {}) } } : {}),
       switches: p.switches,
       seconds_heard: Object.fromEntries(SLOTS.map((k) => [k, +p.heard[k].toFixed(1)])) as Record<Slot, number>,
     })
+  }
+
+  const goTo = (i: number) => {
+    if (i === 3 ? !target : !ratedSteps[i]) return
+    setPage(i)
+    window.scrollTo({ top: 0 })
+  }
+
+  const next = () => {
+    if (page < lastPage) {
+      setPage(page + 1)
+      window.scrollTo({ top: 0 })
+    } else {
+      finish()
+    }
   }
 
   const duration = track.stim.duration
@@ -222,25 +266,86 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
 
         <Separator />
 
-        {!unlocked && (
-          <p className="text-sm text-muted-foreground">{fill(t.unlock, { n: min })}</p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {steps.map(({ label, done }, i) => {
+            const current = i === page
+            const className = cn(
+              "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs leading-none font-medium transition-colors",
+              current ? "bg-primary text-primary-foreground" : done ? "text-foreground" : "text-muted-foreground",
+            )
+            return done && !current ? (
+              <button key={label} type="button" onClick={() => goTo(i)} className={cn(className, "hover:bg-muted")}>
+                <Check className="size-3" />
+                {label}
+              </button>
+            ) : (
+              <span key={label} className={className} aria-current={current ? "step" : undefined}>
+                <span className="font-mono tabular-nums">{i + 1}</span>
+                {label}
+              </span>
+            )
+          })}
+        </div>
+
+        {!unlocked && <p className="text-sm text-muted-foreground">{fill(t.unlock, { n: min })}</p>}
+
+        <div key={page} className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+        {page === 0 && (
+          <RatingGroup
+            id="loud"
+            t={t}
+            question={<>{t.loudQ} <TermInfo term={t.loudnessTerm} definition={t.loudnessDef} label={fill(t.termInfo, { term: t.loudnessTerm })} /></>}
+            hint={t.scaleHint}
+            value={loud}
+            onChange={setLoud}
+            disabled={!unlocked}
+          />
         )}
 
-        <RankOrder id="loud" question={<>{t.loudQ} <TermInfo term={t.loudnessTerm} definition={t.loudnessDef} label={fill(t.termInfo, { term: t.loudnessTerm })} /></>} hint={t.loudHint} value={loud} onChange={setLoud} disabled={!unlocked} clearLabel={t.clear} />
-        <RankOrder id="clear" question={<>{t.clearQ} <TermInfo term={t.clarityTerm} definition={t.clarityDef} label={fill(t.termInfo, { term: t.clarityTerm })} /></>} hint={t.clearHint} value={clear} onChange={setClear} disabled={!unlocked} clearLabel={t.clear} />
-        <RankOrder id="emo" question={<>{t.emoQ} <TermInfo term={t.emotionTerm} definition={t.emotionDef} label={fill(t.termInfo, { term: t.emotionTerm })} /></>} hint={t.emoHint} value={emo} onChange={setEmo} disabled={!unlocked} clearLabel={t.clear} />
+        {page === 1 && (
+          <RatingGroup
+            id="clarity"
+            t={t}
+            question={<>{t.clearQ} <TermInfo term={t.clarityTerm} definition={t.clarityDef} label={fill(t.termInfo, { term: t.clarityTerm })} /></>}
+            hint={t.scaleHint}
+            value={clarity}
+            onChange={setClarity}
+            disabled={!unlocked}
+          />
+        )}
 
-        {top && (
-          <div className="flex flex-col gap-3">
+        {page === 2 && (
+          <>
+            <RatingGroup
+              id="emotion"
+              t={t}
+              question={<>{t.emoQ} <TermInfo term={t.emotionTerm} definition={t.emotionDef} label={fill(t.termInfo, { term: t.emotionTerm })} /></>}
+              hint={t.scaleHint}
+              value={emotion}
+              onChange={setEmotion}
+              disabled={!unlocked}
+            />
+          </>
+        )}
+
+        {page === 3 && target && (
+          <div className="flex flex-col gap-4">
+            <h3 id="why-q" className="font-serif text-lg leading-snug font-medium text-balance">
+              {fill(target.kind === "most" ? t.whyMostQ : t.whyLeastQ, { v: target.slot })}
+            </h3>
             <ChoiceGroup
               id="why"
-              label={fill(t.whyQ, { v: top })}
+              labelledBy="why-q"
               value={why}
               onChange={setWhy}
-              columns={3}
+              columns={2}
               options={[
-                { value: "harsher", label: t.whyHarsh },
-                { value: "warmer", label: t.whyWarm },
+                { value: "harsher", label: t.whyHarsher },
+                { value: "softer", label: t.whySofter },
+                { value: "moreDynamic", label: t.whyMoreDynamic },
+                { value: "lessDynamic", label: t.whyLessDynamic },
+                { value: "memories", label: t.whyMemories },
+                { value: "felt", label: t.whyFelt },
                 { value: "other", label: t.whyOther },
               ]}
             />
@@ -252,9 +357,12 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
             )}
           </div>
         )}
+        </div>
       </CardContent>
       <CardFooter>
-        <Button size="lg" className="w-full sm:w-auto" disabled={!complete} onClick={finish}>{index + 1 < total ? t.nextTrack : t.continue}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={!pageDone} onClick={next}>
+          {page < lastPage ? t.nextQuestion : index + 1 < total ? t.nextTrack : t.continue}
+        </Button>
       </CardFooter>
     </Card>
   )

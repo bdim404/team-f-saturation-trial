@@ -12,9 +12,10 @@ import { Section } from "@/components/study/shared"
 import type { Messages } from "@/i18n"
 import type { StudyResponse } from "@/lib/submit"
 
-export function ChoiceGroup<T extends string>({ id, label, value, options, onChange, columns = 2, disabled }: {
+export function ChoiceGroup<T extends string>({ id, label, labelledBy, value, options, onChange, columns = 2, disabled }: {
   id: string
-  label: string
+  label?: string
+  labelledBy?: string
   value: T | ""
   options: { value: T; label: string }[]
   onChange: (v: T) => void
@@ -23,9 +24,9 @@ export function ChoiceGroup<T extends string>({ id, label, value, options, onCha
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <p id={`${id}-label`} className="font-medium">{label}</p>
+      {label && <p id={`${id}-label`} className="font-medium">{label}</p>}
       <RadioGroup
-        aria-labelledby={`${id}-label`}
+        aria-labelledby={labelledBy ?? (label ? `${id}-label` : undefined)}
         value={value}
         onValueChange={(v) => onChange(v as T)}
         disabled={disabled}

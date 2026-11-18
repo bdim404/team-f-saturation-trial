@@ -12,5 +12,4 @@ export const config = {
   tracks: [{ id: "synth-pop-loop" }] as TrackConfig[],
   drive: { less: 0, base: 2, more: 5 } as Record<Level, number>,
   minSecondsPerVersion: 3,
-  durationMinutes: 7,
 }
