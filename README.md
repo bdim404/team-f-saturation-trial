@@ -69,7 +69,7 @@ Each submission is one JSON object:
         "clarity": { "A": 2, "B": 3, "C": 5 },
         "emotion": { "A": 3, "B": 5, "C": 4 }
       },
-      "why": { "kind": "most", "version": "B", "choice": "harsher" },
+      "why": { "kind": "most", "version": "B", "choices": ["harsher", "moreDynamic"] },
       "switches": 2,
       "seconds_heard": { "A": 8.3, "B": 3.3, "C": 4.8 }
     }
@@ -79,7 +79,7 @@ Each submission is one JSON object:
 }
 ```
 
-Ratings are 0–5 for each version. `why` is only recorded when one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest); `kind` is `most` or `least` and `version` names the version asked about, so the answer can be read without the random A/B/C mapping. When all three emotion ratings are equal, or both the top and the bottom are tied, no `why` is recorded. When **Other** is ticked a free-text field appears and the text is stored in `genres_other`. Genres are stored as comma-separated ids (`pop`, `rockIndie`, `hiphopRap`, `rnbSoul`, `electronic`, `jazzBlues`, `classical`, `latin`, `folk`, `metal`, `singerSongwriter`, `soundtrack`, `world`, `other`); the field is omitted when nothing is selected.
+Ratings are 0–5 for each version. `why.choices` holds every reason the participant ticked (opposite pairs such as harsher/softer cannot both be selected), and `why` is only recorded when one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest); `kind` is `most` or `least` and `version` names the version asked about, so the answer can be read without the random A/B/C mapping. When all three emotion ratings are equal, or both the top and the bottom are tied, no `why` is recorded. When **Other** is ticked a free-text field appears and the text is stored in `genres_other`. Genres are stored as comma-separated ids (`pop`, `rockIndie`, `hiphopRap`, `rnbSoul`, `electronic`, `jazzBlues`, `classical`, `latin`, `folk`, `metal`, `singerSongwriter`, `soundtrack`, `world`, `other`); the field is omitted when nothing is selected.
 
 ## Structure
 

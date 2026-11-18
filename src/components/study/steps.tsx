@@ -66,9 +66,10 @@ export function ChoiceGroup<T extends string>({ id, label, labelledBy, value, op
   )
 }
 
-export function CheckGroup<T extends string>({ id, label, value, options, onChange, columns = 2, chips = false }: {
+export function CheckGroup<T extends string>({ id, label, labelledBy, value, options, onChange, columns = 2, chips = false }: {
   id: string
-  label: string
+  label?: string
+  labelledBy?: string
   value: T[]
   options: { value: T; label: string }[]
   onChange: (v: T[]) => void
@@ -78,10 +79,10 @@ export function CheckGroup<T extends string>({ id, label, value, options, onChan
   const toggle = (v: T) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v])
   return (
     <div className="flex flex-col gap-3">
-      <p id={`${id}-label`} className="font-medium">{label}</p>
+      {label && <p id={`${id}-label`} className="font-medium">{label}</p>}
       <div
         role="group"
-        aria-labelledby={`${id}-label`}
+        aria-labelledby={labelledBy ?? (label ? `${id}-label` : undefined)}
         className={cn(chips ? "flex flex-wrap gap-2" : "grid gap-3", !chips && (columns === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"))}
       >
         {options.map((o) => {

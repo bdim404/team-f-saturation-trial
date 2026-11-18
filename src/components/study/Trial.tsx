@@ -7,8 +7,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
-import { ChoiceGroup } from "@/components/study/steps"
-import { KeyHint, TermInfo, Waveform } from "@/components/study/shared"
+import { CheckGroup } from "@/components/study/steps"
+import { Highlight, KeyHint, TermInfo, Waveform } from "@/components/study/shared"
 import { config } from "@/config"
 import { fill, type Messages } from "@/i18n"
 import { Player, SLOTS, type Slot } from "@/lib/audio"
@@ -81,7 +81,7 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
   const [loud, setLoud] = useState<Ratings>(emptyRatings)
   const [clarity, setClarity] = useState<Ratings>(emptyRatings)
   const [emotion, setEmotion] = useState<Ratings>(emptyRatings)
-  const [why, setWhy] = useState<Why | "">("")
+  const [why, setWhy] = useState<Why[]>([])
   const [whyText, setWhyText] = useState("")
 
   useEffect(() => {
@@ -163,12 +163,18 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
         : null
 
   useEffect(() => {
-    setWhy("")
+    setWhy([])
     setWhyText("")
   }, [target?.kind, target?.slot])
 
+  const toggleWhy = (next: Why[]) => {
+    const added = next.find((x) => !why.includes(x))
+    const opposite: Partial<Record<Why, Why>> = { harsher: "softer", softer: "harsher", moreDynamic: "lessDynamic", lessDynamic: "moreDynamic" }
+    setWhy(added && opposite[added] ? next.filter((x) => x !== opposite[added]) : next)
+  }
+
   const ratedSteps = [allRated(loud), allRated(clarity), allRated(emotion)]
-  const whyAnswered = !target || (why !== "" && (why !== "other" || whyText.trim() !== ""))
+  const whyAnswered = !target || (why.length > 0 && (!why.includes("other") || whyText.trim() !== ""))
   const lastPage = target ? 3 : 2
   const pageDone = unlocked && (page === 0 ? ratedSteps[0] : page === 1 ? ratedSteps[1] : page === 2 ? ratedSteps[2] : whyAnswered)
   const complete = unlocked && ratedSteps[0] && ratedSteps[1] && ratedSteps[2] && whyAnswered
@@ -194,7 +200,7 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
       track: track.id,
       mapping: Object.fromEntries(SLOTS.map((k) => [k, { level: stim.map[k], drive: stim.slots[k].drive }])) as TrialResult["mapping"],
       ratings: { loudness: records(loud), clarity: records(clarity), emotion: records(emotion) },
-      ...(target ? { why: { kind: target.kind, version: target.slot, choice: why as Why, ...(why === "other" ? { text: whyText.trim() } : {}) } } : {}),
+      ...(target ? { why: { kind: target.kind, version: target.slot, choices: why, ...(why.includes("other") ? { text: whyText.trim() } : {}) } } : {}),
       switches: p.switches,
       seconds_heard: Object.fromEntries(SLOTS.map((k) => [k, +p.heard[k].toFixed(1)])) as Record<Slot, number>,
     })
@@ -333,13 +339,13 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
         {page === 3 && target && (
           <div className="flex flex-col gap-4">
             <h3 id="why-q" className="font-serif text-lg leading-snug font-medium text-balance">
-              {fill(target.kind === "most" ? t.whyMostQ : t.whyLeastQ, { v: target.slot })}
+              <Highlight text={fill(target.kind === "most" ? t.whyMostQ : t.whyLeastQ, { v: target.slot })} />
             </h3>
-            <ChoiceGroup
+            <CheckGroup
               id="why"
               labelledBy="why-q"
               value={why}
-              onChange={setWhy}
+              onChange={toggleWhy}
               chips
               options={[
                 { value: "harsher", label: t.whyHarsher },
@@ -351,7 +357,7 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
                 { value: "other", label: t.whyOther },
               ]}
             />
-            {why === "other" && (
+            {why.includes("other") && (
               <>
                 <Label htmlFor="why-text" className="sr-only">{t.whyOther}</Label>
                 <Textarea id="why-text" value={whyText} onChange={(e) => setWhyText(e.target.value)} placeholder={t.whyOtherPh} rows={2} />
