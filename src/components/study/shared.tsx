@@ -21,6 +21,16 @@ export function KeyHint({ t }: { t: Messages }) {
   )
 }
 
+export function Highlight({ text }: { text: string }) {
+  return (
+    <>
+      {text.split("*").map((part, i) =>
+        i % 2 ? <span key={i} className="font-semibold text-red-600 dark:text-red-400">{part}</span> : part,
+      )}
+    </>
+  )
+}
+
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2">

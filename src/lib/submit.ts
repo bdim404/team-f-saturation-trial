@@ -13,7 +13,7 @@ export interface TrialResult {
   why?: {
     kind: "most" | "least"
     version: Slot
-    choice: Why
+    choices: Why[]
     text?: string
   }
   switches: number

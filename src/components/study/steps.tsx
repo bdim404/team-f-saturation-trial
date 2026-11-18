@@ -14,7 +14,7 @@ import type { Notice } from "@/lib/study-api"
 import type { Messages } from "@/i18n"
 import type { StudyResponse } from "@/lib/submit"
 
-export function ChoiceGroup<T extends string>({ id, label, labelledBy, value, options, onChange, columns = 2, disabled }: {
+export function ChoiceGroup<T extends string>({ id, label, labelledBy, value, options, onChange, columns = 2, disabled, chips = false }: {
   id: string
   label?: string
   labelledBy?: string
@@ -23,6 +23,7 @@ export function ChoiceGroup<T extends string>({ id, label, labelledBy, value, op
   onChange: (v: T) => void
   columns?: 1 | 2 | 3
   disabled?: boolean
+  chips?: boolean
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -32,30 +33,45 @@ export function ChoiceGroup<T extends string>({ id, label, labelledBy, value, op
         value={value}
         onValueChange={(v) => onChange(v as T)}
         disabled={disabled}
-        className={cn("grid gap-3", columns === 1 ? "grid-cols-1" : columns === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-3")}
+        className={cn(
+          chips ? "flex flex-wrap gap-2" : cn("grid gap-3", columns === 1 ? "grid-cols-1" : columns === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-3"),
+        )}
       >
-        {options.map((o) => (
-          <Label
-            key={o.value}
-            htmlFor={`${id}-${o.value}`}
-            className={cn(
-              "flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 text-base leading-snug font-normal transition-colors",
-              value === o.value ? "border-primary bg-accent" : "border-border",
-              disabled && "cursor-not-allowed opacity-50",
-            )}
-          >
-            <RadioGroupItem value={o.value} id={`${id}-${o.value}`} />
-            {o.label}
-          </Label>
-        ))}
+        {options.map((o) => {
+          const active = value === o.value
+          return (
+            <Label
+              key={o.value}
+              htmlFor={`${id}-${o.value}`}
+              className={cn(
+                chips
+                  ? "flex cursor-pointer items-center gap-1.5 rounded-full border-2 px-3.5 py-2 text-sm leading-snug font-normal transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50"
+                  : "flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 text-base leading-snug font-normal transition-colors",
+                active
+                  ? chips
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-primary bg-accent"
+                  : chips
+                    ? "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+                    : "border-border",
+                disabled && "cursor-not-allowed opacity-50",
+              )}
+            >
+              <RadioGroupItem value={o.value} id={`${id}-${o.value}`} className={chips ? "sr-only" : undefined} />
+              {chips && active && <Check className="size-3.5" />}
+              {o.label}
+            </Label>
+          )
+        })}
       </RadioGroup>
     </div>
   )
 }
 
-export function CheckGroup<T extends string>({ id, label, value, options, onChange, columns = 2, chips = false }: {
+export function CheckGroup<T extends string>({ id, label, labelledBy, value, options, onChange, columns = 2, chips = false }: {
   id: string
-  label: string
+  label?: string
+  labelledBy?: string
   value: T[]
   options: { value: T; label: string }[]
   onChange: (v: T[]) => void
@@ -65,10 +81,10 @@ export function CheckGroup<T extends string>({ id, label, value, options, onChan
   const toggle = (v: T) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v])
   return (
     <div className="flex flex-col gap-3">
-      <p id={`${id}-label`} className="font-medium">{label}</p>
+      {label && <p id={`${id}-label`} className="font-medium">{label}</p>}
       <div
         role="group"
-        aria-labelledby={`${id}-label`}
+        aria-labelledby={labelledBy ?? (label ? `${id}-label` : undefined)}
         className={cn(chips ? "flex flex-wrap gap-2" : "grid gap-3", !chips && (columns === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"))}
       >
         {options.map((o) => {

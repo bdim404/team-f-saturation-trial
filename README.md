@@ -29,7 +29,7 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm build` writes the static site to `dist/`.
+`pnpm build` writes the static site to `dist/`, and `pnpm preview` serves that build on http://localhost:4173.
 
 ## Configuration
 
@@ -67,8 +67,9 @@ Theme/language preferences are independent.
 
 The wire format is schema 2: `release`, `language`, `answers`, `answer_languages`,
 `timings`, `mapping`, `seconds_heard`, `switches`, `submitted`. Nine rating question
-IDs (`loudness_A` etc.) use option IDs `0` through `5`; background/genres use arrays of
-option IDs. All 17 timing entries include first seen/answered/last answered timestamps,
+IDs (`loudness_A` etc.) use option IDs `0` through `5`; background/genres/reasons use arrays of
+option IDs. The multiple-reason revision rejects opposite pairs and keeps older
+single-reason releases separate. All 17 timing entries include first seen/answered/last answered timestamps,
 answer changes, visible active time and elapsed time while that question is shown.
 Hidden-tab time is excluded from active time, and hidden tabs pause audio.
 
@@ -98,7 +99,7 @@ The UI components still use these in-memory types. This is **not** the API paylo
         "clarity": { "A": 2, "B": 3, "C": 5 },
         "emotion": { "A": 3, "B": 5, "C": 4 }
       },
-      "why": { "kind": "most", "version": "B", "choice": "harsher" },
+      "why": { "kind": "most", "version": "B", "choices": ["harsher", "moreDynamic"] },
       "switches": 2,
       "seconds_heard": { "A": 8.3, "B": 3.3, "C": 4.8 }
     }
@@ -108,7 +109,7 @@ The UI components still use these in-memory types. This is **not** the API paylo
 }
 ```
 
-Ratings are 0–5 for each version. `why` is only recorded when one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest); `kind` is `most` or `least` and `version` names the version asked about, so the answer can be read without the random A/B/C mapping. When all three emotion ratings are equal, or both the top and the bottom are tied, no `why` is recorded. When **Other** is ticked a free-text field appears and the text is stored in `genres_other`. Genres are stored as comma-separated ids (`pop`, `rockIndie`, `hiphopRap`, `rnbSoul`, `electronic`, `jazzBlues`, `classical`, `latin`, `folk`, `metal`, `singerSongwriter`, `soundtrack`, `world`, `other`); the field is omitted when nothing is selected.
+Ratings are 0–5 for each version. `why.choices` holds every reason the participant ticked (opposite pairs such as harsher/softer cannot both be selected), and `why` is only recorded when one version is rated uniquely highest on emotion (or, if the top is tied, uniquely lowest); `kind` is `most` or `least` and `version` names the version asked about, so the answer can be read without the random A/B/C mapping. When all three emotion ratings are equal, or both the top and the bottom are tied, no `why` is recorded. When **Other** is ticked a free-text field appears and the text is stored in `genres_other`. Genres are stored as comma-separated ids (`pop`, `rockIndie`, `hiphopRap`, `rnbSoul`, `electronic`, `jazzBlues`, `classical`, `latin`, `folk`, `metal`, `singerSongwriter`, `soundtrack`, `world`, `other`); the field is omitted when nothing is selected.
 
 ## Structure
 

@@ -141,3 +141,23 @@ test('same-origin deployment is explicit and allows HTTP only on loopback', () =
   assert.throws(() => deploymentOrigin('http://localhost:8357','https://listening.example.org'))
   assert.equal(deploymentOrigin('https://api.example.org','https://listening.example.org'),'https://api.example.org')
 })
+
+
+test('audio credits only the selected variant and excludes paused time', () => {
+  const player = new Player({ duration: 10, slots: {}, map: {} })
+  player.ctx = { currentTime: 0 }; player.playing = true; player.lastMark = 0
+  player.ctx.currentTime = 4; player.select('B')
+  player.ctx.currentTime = 9; player.select('C')
+  player.ctx.currentTime = 15; player.tally(); player.playing = false
+  player.ctx.currentTime = 115; player.tally()
+  assert.deepEqual(player.heard, { A: 4, B: 5, C: 6 }); assert.equal(player.switches, 2)
+})
+test('multiple reasons retain all choices and clearing other removes its text', () => {
+  const data = new Measurements(['why','why_other'])
+  data.show(['why','why_other']); data.answer('why',['felt','other'],'es'); data.answer('why_other','Synthetic reason','es')
+  const selected=['felt','moreDynamic']; data.answer('why',selected,'ca'); data.answer('why_other',undefined,'ca')
+  selected.push('memories')
+  const result=data.snapshot()
+  assert.deepEqual(result.answers,{why:['felt','moreDynamic']}); assert.equal(result.answer_languages.why,'ca')
+  assert.equal(result.timings.why.changes,2); assert(!('why_other' in result.answer_languages))
+})
