@@ -13,6 +13,7 @@ import { fill, type Messages } from "@/i18n"
 import { Player, SLOTS, type Slot } from "@/lib/audio"
 import type { TrialResult, Why } from "@/lib/submit"
 import type { LoadedTrack } from "@/lib/tracks"
+import { pauseOnHidden } from "@/lib/visibility"
 
 const fmt = (s: number) => {
   const v = Math.max(0, s)
@@ -87,7 +88,14 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
   useEffect(() => {
     const p = new Player(track.stim)
     player.current = p
+    const stopWatching = pauseOnHidden(document, () => {
+      p.pause()
+      setTime(p.time())
+      setHeard({ ...p.heard })
+      setPlaying(false)
+    })
     return () => {
+      stopWatching()
       p.dispose()
       player.current = null
     }

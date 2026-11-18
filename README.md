@@ -18,6 +18,8 @@ Live site: https://listening.bdim.es
 4. For each track: three versions (A, B, C in random order), each must be heard for at least 3 seconds, then three ranking questions and "why was the most emotional version the most emotional?"
 5. Optional question about preferred genres, then submit
 
+Playback pauses when the page becomes hidden. Returning to the page keeps it paused until Play is pressed again; listening time already accumulated is retained. These counters describe playback, not verified human attention.
+
 The interface is available in English (default), Spanish, Catalan, French, German, Italian, Portuguese, Dutch, Polish, Swedish, Greek, Turkish and Chinese, with light, dark and system themes. Add `?lang=es` (or any other code) to a link to open it in that language.
 
 ## Development
@@ -30,6 +32,8 @@ pnpm dev
 ```
 
 `pnpm build` writes the static site to `dist/`.
+
+Run the visibility and playback regression tests with `node --test tests/visibility.test.mjs` after installing dependencies. They use synthetic events, audio nodes and a clock, without a backend or participant data.
 
 ## Configuration
 
