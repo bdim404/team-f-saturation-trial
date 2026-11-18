@@ -30,6 +30,7 @@ export interface StudyResponse {
     music_background_other?: string
     headphones: "in-ear" | "over-ear"
     genres?: string
+    genres_other?: string
   }
   trials: TrialResult[]
   consented: string

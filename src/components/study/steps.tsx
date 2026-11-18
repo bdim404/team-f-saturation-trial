@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Check } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
@@ -7,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
-import { Textarea } from "@/components/ui/textarea"
 import { Section } from "@/components/study/shared"
 import type { Messages } from "@/i18n"
 import type { StudyResponse } from "@/lib/submit"
@@ -51,32 +51,54 @@ export function ChoiceGroup<T extends string>({ id, label, labelledBy, value, op
   )
 }
 
-export function CheckGroup<T extends string>({ id, label, value, options, onChange, columns = 2 }: {
+export function CheckGroup<T extends string>({ id, label, value, options, onChange, columns = 2, chips = false }: {
   id: string
   label: string
   value: T[]
   options: { value: T; label: string }[]
   onChange: (v: T[]) => void
   columns?: 1 | 2
+  chips?: boolean
 }) {
   const toggle = (v: T) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v])
   return (
     <div className="flex flex-col gap-3">
       <p id={`${id}-label`} className="font-medium">{label}</p>
-      <div role="group" aria-labelledby={`${id}-label`} className={cn("grid gap-3", columns === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
-        {options.map((o) => (
-          <Label
-            key={o.value}
-            htmlFor={`${id}-${o.value}`}
-            className={cn(
-              "flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 text-base leading-snug font-normal transition-colors",
-              value.includes(o.value) ? "border-primary bg-accent" : "border-border",
-            )}
-          >
-            <Checkbox id={`${id}-${o.value}`} checked={value.includes(o.value)} onCheckedChange={() => toggle(o.value)} />
-            {o.label}
-          </Label>
-        ))}
+      <div
+        role="group"
+        aria-labelledby={`${id}-label`}
+        className={cn(chips ? "flex flex-wrap gap-2" : "grid gap-3", !chips && (columns === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"))}
+      >
+        {options.map((o) => {
+          const active = value.includes(o.value)
+          return (
+            <Label
+              key={o.value}
+              htmlFor={`${id}-${o.value}`}
+              className={cn(
+                chips
+                  ? "flex cursor-pointer items-center gap-1.5 rounded-full border-2 px-3.5 py-2 text-sm leading-snug font-normal transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50"
+                  : "flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 text-base leading-snug font-normal transition-colors",
+                active
+                  ? chips
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-primary bg-accent"
+                  : chips
+                    ? "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+                    : "border-border",
+              )}
+            >
+              <Checkbox
+                id={`${id}-${o.value}`}
+                checked={active}
+                onCheckedChange={() => toggle(o.value)}
+                className={chips ? "sr-only" : undefined}
+              />
+              {chips && active && <Check className="size-3.5" />}
+              {o.label}
+            </Label>
+          )
+        })}
       </div>
     </div>
   )
@@ -216,19 +238,62 @@ export function Definitions({ t, onDone }: { t: Messages; onDone: () => void }) 
   )
 }
 
-export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending: boolean; failed: boolean; onSubmit: (genres: string) => void }) {
-  const [genres, setGenres] = useState("")
+type Genre = "pop" | "rockIndie" | "hiphopRap" | "rnbSoul" | "electronic" | "jazzBlues" | "classical" | "latin" | "folk" | "metal" | "singerSongwriter" | "soundtrack" | "world" | "other"
+
+const GENRE_ORDER: Genre[] = ["pop", "rockIndie", "hiphopRap", "rnbSoul", "electronic", "jazzBlues", "classical", "latin", "folk", "metal", "singerSongwriter", "soundtrack", "world", "other"]
+
+export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending: boolean; failed: boolean; onSubmit: (genres: string, other: string) => void }) {
+  const [genres, setGenres] = useState<Genre[]>([])
+  const [other, setOther] = useState("")
+  const otherMissing = genres.includes("other") && other.trim() === ""
   return (
     <Card>
       <CardContent className="flex flex-col gap-4">
         <Section title={t.genresTitle}>
-          <Label htmlFor="genres" className="text-base font-normal text-muted-foreground">{t.genresQ}</Label>
+          <CheckGroup
+            id="genres"
+            label={t.genresQ}
+            chips
+            value={genres}
+            onChange={setGenres}
+            options={[
+              { value: "pop", label: t.genrePop },
+              { value: "rockIndie", label: t.genreRock },
+              { value: "hiphopRap", label: t.genreHipHop },
+              { value: "rnbSoul", label: t.genreRnb },
+              { value: "electronic", label: t.genreElectronic },
+              { value: "jazzBlues", label: t.genreJazz },
+              { value: "classical", label: t.genreClassical },
+              { value: "latin", label: t.genreLatin },
+              { value: "folk", label: t.genreFolk },
+              { value: "metal", label: t.genreMetal },
+              { value: "singerSongwriter", label: t.genreSinger },
+              { value: "soundtrack", label: t.genreSoundtrack },
+              { value: "world", label: t.genreWorld },
+              { value: "other", label: t.genreOther },
+            ]}
+          />
+          {genres.includes("other") && (
+            <>
+              <Input
+                id="genres-other"
+                aria-label={t.genreOtherPh}
+                aria-describedby={otherMissing ? "genres-other-hint" : undefined}
+                placeholder={t.genreOtherPh}
+                required
+                value={other}
+                onChange={(e) => setOther(e.target.value)}
+              />
+              {otherMissing && (
+                <p id="genres-other-hint" className="text-xs text-muted-foreground">{t.genreOtherRequired}</p>
+              )}
+            </>
+          )}
         </Section>
-        <Textarea id="genres" value={genres} onChange={(e) => setGenres(e.target.value)} placeholder={t.genresPh} rows={3} />
         {failed && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
       </CardContent>
       <CardFooter>
-        <Button size="lg" className="w-full sm:w-auto" disabled={sending} onClick={() => onSubmit(genres.trim())}>{sending ? t.sending : t.submit}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={sending || otherMissing} onClick={() => onSubmit(GENRE_ORDER.filter((g) => genres.includes(g)).join(", "), other.trim())}>{sending ? t.sending : t.submit}</Button>
       </CardFooter>
     </Card>
   )
