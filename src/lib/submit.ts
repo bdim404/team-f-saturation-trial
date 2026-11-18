@@ -20,6 +20,7 @@ export interface StudyResponse {
   participant: {
     music_background: boolean
     music_background_type?: string
+    music_background_other?: string
     headphones: "in-ear" | "over-ear"
     genres?: string
   }
