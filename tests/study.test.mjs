@@ -161,3 +161,42 @@ test('multiple reasons retain all choices and clearing other removes its text', 
   assert.deepEqual(result.answers,{why:['felt','moreDynamic']}); assert.equal(result.answer_languages.why,'ca')
   assert.equal(result.timings.why.changes,2); assert(!('why_other' in result.answer_languages))
 })
+
+const { canRestartTest, newTestLabel } = await load('staging')
+test('test restart fails closed outside explicitly enabled staging demo', () => {
+  assert.equal(canRestartTest('true', 'https://staging.soundandmusic.eu', true), true)
+  for (const origin of ['https://listening.bdim.es', 'https://mpc-study-staging.pages.dev', 'http://staging.soundandmusic.eu', 'https://staging.soundandmusic.eu.attacker.example']) {
+    assert.equal(canRestartTest('true', origin, true), false)
+  }
+  for (const flag of [undefined, '', 'false']) assert.equal(canRestartTest(flag, 'https://staging.soundandmusic.eu', true), false)
+  assert.equal(canRestartTest('true', 'https://staging.soundandmusic.eu', false), false)
+  assert.equal(canRestartTest('true', 'https://staging.soundandmusic.eu', undefined), false)
+  assert.deepEqual(Object.keys(newTestLabel).sort(), ['en','es','ca','fr','de','it','pt','nl','pl','sv','el','tr','zh'].sort())
+})
+test('starting another test uses a distinct identity without deleting the saved submission', async () => {
+  const storage = memory(), rows = new Map(), requests = []
+  let attempt = 'first'
+  const api = new StudyAPI('https://api.example.org', storage, async (url, options) => {
+    requests.push({ url, options })
+    if (url.endsWith('bootstrap/')) return response({ attempt, csrf: 'csrf', saved: rows.has(attempt), closed: false })
+    if (url.endsWith('protocol/')) return response({ protocol: { release: 'release-1' }, language: 'es' })
+    if (url.includes('entry/?')) { attempt = 'second'; return response({ attempt, csrf: 'csrf-new', saved: false, closed: false }) }
+    if (url.endsWith('responses/')) {
+      const id = options.headers['X-Local-Submission-ID']
+      assert.equal(id, attempt); rows.set(id, options.body)
+      return response({ saved: true, id }, 201)
+    }
+    throw new Error('Unexpected route, including deletion')
+  })
+  await api.bootstrap(); await api.submit({ answers: { why: ['softer'] } })
+  const firstKey = storage.getItem('mpc-local-key:first')
+  assert(await api.restoreReceipt('release-1'))
+  await api.start({ language: 'es', release: 'release-1', notice_version: 'test', csrf: 'csrf' }, '')
+  await api.submit({ answers: { why: ['moreDynamic'] } })
+  assert.equal(rows.size, 2)
+  assert.equal(storage.getItem('mpc-local-key:first'), firstKey)
+  assert.notEqual(storage.getItem('mpc-local-key:second'), firstKey)
+  assert(!JSON.stringify([...storage.values]).includes('answers'))
+  assert(await api.restoreReceipt('release-1'))
+  assert(!requests.some(r => r.url.includes('export/delete/')))
+})

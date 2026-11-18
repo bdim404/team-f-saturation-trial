@@ -6,6 +6,7 @@ import { Background, Definitions, Genres, Welcome } from "@/components/study/ste
 import { Trial } from "@/components/study/Trial"
 import { Button } from "@/components/ui/button"
 import { StudyAPI, deploymentOrigin, type Notice } from "@/lib/study-api"
+import { canRestartTest, newTestLabel } from "@/lib/staging"
 import { Measurements, type Measure } from "@/lib/study-measurements"
 import { BUNDLE_REVISION, questionIds } from "@/lib/study-bundle"
 import type { Instrument } from "@/lib/study-model"
@@ -40,6 +41,8 @@ export default function App() {
   const measurements = useRef<Measurements | null>(null)
   const currentLang = useRef(lang)
   const locked = useRef(false)
+  const skipReceipt = useRef(false)
+  const restartAllowed = canRestartTest(import.meta.env.VITE_ENABLE_TEST_RESTART, window.location.origin, instrument.current?.protocol.demo)
   const [measure] = useState<Measure>(() => ({
     show: ids => measurements.current?.show(ids, document.visibilityState === 'visible'),
     answer: (id, value) => { if (!locked.current) measurements.current?.answer(id, value, currentLang.current) },
@@ -86,7 +89,7 @@ export default function App() {
     const release = import.meta.env.VITE_STUDY_RELEASE
     if (!release) { setEntryFailed(true); return }
     const prepare = async () => {
-      const saved = await api.restoreReceipt(release)
+      const saved = skipReceipt.current ? null : await api.restoreReceipt(release)
       if (cancelled) return
       if (saved) {
         if (!Object.prototype.hasOwnProperty.call(messages, saved.language)) throw new Error('Unsupported receipt language.')
@@ -109,6 +112,18 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', visibility)
   }, [])
 
+  const restartTest = () => {
+    if (!restartAllowed || step.kind !== 'done' || starting || sending) return
+    // Do not delete the previous submission or discard its receipt key.
+    // A fresh server attempt is created only after consent and Start.
+    skipReceipt.current = true
+    participant.current = null; results.current = []
+    measurements.current = null; instrument.current = null; locked.current = false
+    setTracks(null); setNotice(null); setDeleted(false)
+    setLoadFailed(false); setSendFailed(false); setReceiptFailed(false); setEntryFailed(false)
+    go({ kind: 'welcome' })
+  }
+
   const start = async () => {
     if (starting || (api && (!notice || notice.language !== lang))) return
     setStarting(true); setEntryFailed(false)
@@ -121,6 +136,7 @@ export default function App() {
         measurements.current = new Measurements(questionIds)
         setTracks(await loadTracks(value.mapping))
       }
+      skipReceipt.current = false
       go({ kind: 'background' })
     } catch { setEntryFailed(true) }
     finally { setStarting(false) }
@@ -227,10 +243,13 @@ export default function App() {
             <CardTitle className="flex items-center gap-2 font-serif text-xl"><Check className="size-5" /> {t.thanksTitle}</CardTitle>
             <CardDescription>{deleted ? instrument.current?.presentation.status[2] : t.thanksBody}</CardDescription>
           </CardHeader>
-          {api && !deleted && <CardContent className="flex flex-wrap gap-3">
+          {api && (!deleted || restartAllowed) && <CardContent className="flex flex-wrap gap-3">
+            {!deleted && <>
             <Button variant="outline" onClick={() => download('json')}>{instrument.current?.presentation.receipt[2]}</Button>
             <Button variant="outline" onClick={() => download('csv')}>{instrument.current?.presentation.receipt[3]}</Button>
             <Button variant="outline" onClick={withdraw}>{instrument.current?.presentation.deletion.confirm}</Button>
+            </>}
+            {restartAllowed && <Button variant="outline" onClick={restartTest}>{newTestLabel[lang]}</Button>}
             {receiptFailed && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
           </CardContent>}
         </Card>

@@ -151,3 +151,14 @@ Run `node --test tests/study.test.mjs tests/gateway.test.mjs` and verify the dep
 Pages/HTTPS save, retry, receipt and withdrawal flow before enabling any environment.
 A local HTTP Docker test alone cannot validate the deployed gateway.
 The production Pages branch remains main; publishing dev does not activate this code.
+
+### Repeating staging tests
+
+Build staging with `VITE_ENABLE_TEST_RESTART=true` to show **New test** after a
+confirmed submission (also after receipt recovery or withdrawal). This control is
+restricted to `https://staging.soundandmusic.eu` and a demo release, even if the
+flag is accidentally enabled elsewhere. It resets in-memory form state and returns
+to unchecked consent; the next Start creates a new server attempt. Previous
+submissions remain in the backend. Download a receipt before starting the next test
+if you need a local copy. Reload alone still restores the current saved receipt,
+including after a lost acknowledgement, rather than silently starting a new attempt.
