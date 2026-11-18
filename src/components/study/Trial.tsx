@@ -168,8 +168,19 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
 
   const ratedSteps = [allRated(loud), allRated(clarity), allRated(emotion)]
   const whyAnswered = !target || (why !== "" && (why !== "other" || whyText.trim() !== ""))
-  const pageDone = unlocked && (page === 0 ? allRated(loud) : page === 1 ? allRated(clarity) : allRated(emotion) && whyAnswered)
-  const complete = unlocked && allRated(loud) && allRated(clarity) && allRated(emotion) && whyAnswered
+  const lastPage = target ? 3 : 2
+  const pageDone = unlocked && (page === 0 ? ratedSteps[0] : page === 1 ? ratedSteps[1] : page === 2 ? ratedSteps[2] : whyAnswered)
+  const complete = unlocked && ratedSteps[0] && ratedSteps[1] && ratedSteps[2] && whyAnswered
+  const steps = [
+    { label: t.loudnessTerm, done: ratedSteps[0] },
+    { label: t.clarityTerm, done: ratedSteps[1] },
+    { label: t.emotionTerm, done: ratedSteps[2] },
+    ...(target ? [{ label: t.whyStep, done: whyAnswered }] : []),
+  ]
+
+  useEffect(() => {
+    if (page === 3 && !target) setPage(2)
+  }, [page, target])
 
   const finish = () => {
     const p = player.current
@@ -189,13 +200,13 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
   }
 
   const goTo = (i: number) => {
-    if (!ratedSteps[i]) return
+    if (i === 3 ? !target : !ratedSteps[i]) return
     setPage(i)
     window.scrollTo({ top: 0 })
   }
 
   const next = () => {
-    if (page < 2) {
+    if (page < lastPage) {
       setPage(page + 1)
       window.scrollTo({ top: 0 })
     } else {
@@ -256,13 +267,13 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
         <Separator />
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {[t.loudnessTerm, t.clarityTerm, t.emotionTerm].map((label, i) => {
+          {steps.map(({ label, done }, i) => {
             const current = i === page
             const className = cn(
               "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs leading-none font-medium transition-colors",
-              current ? "bg-primary text-primary-foreground" : ratedSteps[i] ? "text-foreground" : "text-muted-foreground",
+              current ? "bg-primary text-primary-foreground" : done ? "text-foreground" : "text-muted-foreground",
             )
-            return ratedSteps[i] && !current ? (
+            return done && !current ? (
               <button key={label} type="button" onClick={() => goTo(i)} className={cn(className, "hover:bg-muted")}>
                 <Check className="size-3" />
                 {label}
@@ -314,39 +325,43 @@ export function Trial({ t, track, index, total, onDone }: { t: Messages; track: 
               onChange={setEmotion}
               disabled={!unlocked}
             />
-            {target && (
-              <div className="flex flex-col gap-3">
-                <ChoiceGroup
-                  id="why"
-                  label={fill(target.kind === "most" ? t.whyMostQ : t.whyLeastQ, { v: target.slot })}
-                  value={why}
-                  onChange={setWhy}
-                  columns={2}
-                  options={[
-                    { value: "harsher", label: t.whyHarsher },
-                    { value: "softer", label: t.whySofter },
-                    { value: "moreDynamic", label: t.whyMoreDynamic },
-                    { value: "lessDynamic", label: t.whyLessDynamic },
-                    { value: "memories", label: t.whyMemories },
-                    { value: "felt", label: t.whyFelt },
-                    { value: "other", label: t.whyOther },
-                  ]}
-                />
-                {why === "other" && (
-                  <>
-                    <Label htmlFor="why-text" className="sr-only">{t.whyOther}</Label>
-                    <Textarea id="why-text" value={whyText} onChange={(e) => setWhyText(e.target.value)} placeholder={t.whyOtherPh} rows={2} />
-                  </>
-                )}
-              </div>
-            )}
           </>
+        )}
+
+        {page === 3 && target && (
+          <div className="flex flex-col gap-4">
+            <h3 id="why-q" className="font-serif text-lg leading-snug font-medium text-balance">
+              {fill(target.kind === "most" ? t.whyMostQ : t.whyLeastQ, { v: target.slot })}
+            </h3>
+            <ChoiceGroup
+              id="why"
+              labelledBy="why-q"
+              value={why}
+              onChange={setWhy}
+              columns={2}
+              options={[
+                { value: "harsher", label: t.whyHarsher },
+                { value: "softer", label: t.whySofter },
+                { value: "moreDynamic", label: t.whyMoreDynamic },
+                { value: "lessDynamic", label: t.whyLessDynamic },
+                { value: "memories", label: t.whyMemories },
+                { value: "felt", label: t.whyFelt },
+                { value: "other", label: t.whyOther },
+              ]}
+            />
+            {why === "other" && (
+              <>
+                <Label htmlFor="why-text" className="sr-only">{t.whyOther}</Label>
+                <Textarea id="why-text" value={whyText} onChange={(e) => setWhyText(e.target.value)} placeholder={t.whyOtherPh} rows={2} />
+              </>
+            )}
+          </div>
         )}
         </div>
       </CardContent>
       <CardFooter>
         <Button size="lg" className="w-full sm:w-auto" disabled={!pageDone} onClick={next}>
-          {page < 2 ? t.nextQuestion : index + 1 < total ? t.nextTrack : t.continue}
+          {page < lastPage ? t.nextQuestion : index + 1 < total ? t.nextTrack : t.continue}
         </Button>
       </CardFooter>
     </Card>
