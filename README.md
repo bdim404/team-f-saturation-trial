@@ -5,7 +5,7 @@ Online listening test for the Team F project in Music Perception and Cognition (
 Live site: https://listening.bdim.es
 
 > [!IMPORTANT]
-> **Pushing to `main` deploys to production.** The repository is connected to Cloudflare Pages, so every push to `main` is built and published to https://listening.bdim.es within a minute or two. Pushes to other branches get a preview URL on `*.team-f-saturation-trial.pages.dev`. Use a branch for anything you are not ready to show participants.
+> **Pushing to `main` deploys to production.** The Cloudflare Pages project only builds the production branch, so every push to `main` is built and published to https://listening.bdim.es within a minute or two. Other branches and pull requests are not deployed; build and check a change locally with `pnpm build && pnpm preview` before merging.
 
 > [!WARNING]
 > **There is no backend yet, so responses are not stored.** When a participant submits, the response is only printed to the browser console (`study response`) and then discarded. Do not share the link with real participants until `VITE_SUBMIT_URL` points to a server that saves the data.
@@ -29,7 +29,7 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm build` writes the static site to `dist/`.
+`pnpm build` writes the static site to `dist/`, and `pnpm preview` serves that build on http://localhost:4173.
 
 ## Configuration
 
