@@ -61,7 +61,7 @@ export function Welcome({ t, onStart }: { t: Messages; onStart: () => void }) {
         </Section>
         <Section title={t.prepTitle}>
           <ul className="flex list-disc flex-col gap-1.5 pl-5 text-muted-foreground marker:text-border">
-            <li>{t.prep1}</li>
+            <li><strong className="font-semibold text-foreground">{t.prep1.lead}</strong>{t.prep1.rest}</li>
             <li>{t.prep2}</li>
             <li>{t.prep3}</li>
           </ul>
