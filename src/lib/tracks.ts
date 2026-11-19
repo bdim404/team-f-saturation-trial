@@ -1,5 +1,5 @@
 import { config, type TrackConfig } from "@/config"
-import { buildStimuli, LEVELS, loadStimulus, saturateAll, synthLoop, type Level, type Stimuli } from "@/lib/audio"
+import { buildStimuli, LEVELS, loadStimulus, saturateAll, synthLoop, SLOTS, type Slot, type Level, type Stimuli } from "@/lib/audio"
 
 export interface LoadedTrack {
   id: string
@@ -21,8 +21,12 @@ async function loadOne(track: TrackConfig): Promise<LoadedTrack> {
   return { id: track.id, stim: await buildStimuli(saturateAll(source, config.drive), config.drive), waveform: source }
 }
 
-export async function loadTracks() {
+export async function loadTracks(mapping?: Record<Slot, Level>) {
   const out: LoadedTrack[] = []
   for (const t of config.tracks) out.push(await loadOne(t))
+  if (mapping) for (const track of out) {
+    const byLevel = Object.fromEntries(SLOTS.map(s => [track.stim.map[s], track.stim.slots[s]])) as Record<Level, Stimuli['slots']['A']>
+    track.stim = { ...track.stim, map: mapping, slots: Object.fromEntries(SLOTS.map(s => [s, byLevel[mapping[s]]])) as Stimuli['slots'] }
+  }
   return out
 }

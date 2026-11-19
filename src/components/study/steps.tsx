@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Check } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Section } from "@/components/study/shared"
-import type { Messages } from "@/i18n"
+import type { Measure } from "@/lib/study-measurements"
+import type { Notice } from "@/lib/study-api"
+import { fill, type Messages } from "@/i18n"
 import type { StudyResponse } from "@/lib/submit"
 
 export function ChoiceGroup<T extends string>({ id, label, labelledBy, value, options, onChange, columns = 2, disabled, chips = false }: {
@@ -120,7 +122,7 @@ export function CheckGroup<T extends string>({ id, label, labelledBy, value, opt
   )
 }
 
-export function Welcome({ t, onStart }: { t: Messages; onStart: () => void }) {
+export function Welcome({ t, onStart, notice, busy, failed, ready = true }: { t: Messages; onStart: () => void; notice?: Notice | null; busy?: boolean; failed?: boolean; ready?: boolean }) {
   const [agreed, setAgreed] = useState(false)
   return (
     <Card>
@@ -136,16 +138,17 @@ export function Welcome({ t, onStart }: { t: Messages; onStart: () => void }) {
           </ul>
         </Section>
         <Section title={t.privacyTitle}>
-          <p className="text-muted-foreground">{t.privacy}</p>
+          <p className="text-muted-foreground">{t.privacy}{notice && " " + notice.notice.paragraphs.join(" ")}</p>
         </Section>
+        {failed && <p role="alert" className="text-sm text-destructive">{t.entryError}</p>}
         <Separator />
         <Label htmlFor="consent" className="flex cursor-pointer items-start gap-3 text-base leading-snug font-normal">
           <Checkbox id="consent" checked={agreed} onCheckedChange={(v) => setAgreed(v === true)} className="mt-0.5" />
-          {t.consent}
+          {t.consent}{notice && " " + notice.notice.acknowledgement}
         </Label>
       </CardContent>
       <CardFooter>
-        <Button size="lg" className="w-full sm:w-auto" disabled={!agreed} onClick={onStart}>{t.start}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={!agreed || busy || !ready} onClick={onStart}>{busy ? t.starting : t.start}</Button>
       </CardFooter>
     </Card>
   )
@@ -157,11 +160,18 @@ type MusicBackground = "instrument" | "singing" | "production" | "musicStudies" 
 
 const MUSIC_BACKGROUND_ORDER: MusicBackground[] = ["instrument", "singing", "production", "musicStudies", "other"]
 
-export function Background({ t, onDone }: { t: Messages; onDone: (p: Omit<Participant, "genres">) => void }) {
+export function Background({ t, onDone, measure }: { t: Messages; onDone: (p: Omit<Participant, "genres">) => void; measure?: Measure }) {
   const [music, setMusic] = useState<"yes" | "no" | "">("")
   const [musicTypes, setMusicTypes] = useState<MusicBackground[]>([])
   const [musicTypeOther, setMusicTypeOther] = useState("")
   const [phones, setPhones] = useState<Participant["headphones"] | "">("")
+  useEffect(() => {
+    measure?.show(['music_background','headphones', ...(music === 'yes' ? ['music_background_type', ...(musicTypes.includes('other') ? ['music_background_other'] : [])] : [])])
+    measure?.answer('music_background', music || undefined)
+    measure?.answer('headphones', phones || undefined)
+    measure?.answer('music_background_type', music === 'yes' && musicTypes.length ? musicTypes : undefined)
+    measure?.answer('music_background_other', music === 'yes' && musicTypes.includes('other') && musicTypeOther.trim() ? musicTypeOther.trim() : undefined)
+  }, [music, musicTypes, musicTypeOther, phones, measure])
   const otherMissing = music === "yes" && musicTypes.includes("other") && musicTypeOther.trim() === ""
   const ok = music !== "" && phones !== "" && !otherMissing
   return (
@@ -258,9 +268,14 @@ type Genre = "pop" | "rockIndie" | "hiphopRap" | "rnbSoul" | "electronic" | "jaz
 
 const GENRE_ORDER: Genre[] = ["pop", "rockIndie", "hiphopRap", "rnbSoul", "electronic", "jazzBlues", "classical", "latin", "folk", "metal", "singerSongwriter", "soundtrack", "world", "other"]
 
-export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending: boolean; failed: boolean; onSubmit: (genres: string, other: string) => void }) {
+export function Genres({ t, sending, failed, onSubmit, measure, locked, rejectedStatus, onReload }: { t: Messages; sending: boolean; failed: boolean; onSubmit: (genres: string, other: string) => void; measure?: Measure; locked?: boolean; rejectedStatus?: number | null; onReload?: () => void }) {
   const [genres, setGenres] = useState<Genre[]>([])
   const [other, setOther] = useState("")
+  useEffect(() => {
+    measure?.show(['genres', ...(genres.includes('other') ? ['genres_other'] : [])])
+    measure?.answer('genres', genres.length ? genres : undefined)
+    measure?.answer('genres_other', genres.includes('other') && other.trim() ? other.trim() : undefined)
+  }, [genres, other, measure])
   const otherMissing = genres.includes("other") && other.trim() === ""
   return (
     <Card>
@@ -271,7 +286,7 @@ export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending:
             label={t.genresQ}
             chips
             value={genres}
-            onChange={setGenres}
+            onChange={value => { if (!locked) setGenres(value) }}
             options={[
               { value: "pop", label: t.genrePop },
               { value: "rockIndie", label: t.genreRock },
@@ -298,6 +313,7 @@ export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending:
                 placeholder={t.genreOtherPh}
                 required
                 value={other}
+                readOnly={locked}
                 onChange={(e) => setOther(e.target.value)}
               />
               {otherMissing && (
@@ -306,10 +322,10 @@ export function Genres({ t, sending, failed, onSubmit }: { t: Messages; sending:
             </>
           )}
         </Section>
-        {failed && <p role="alert" className="text-sm text-destructive">{t.sendError}</p>}
+        {failed && <p role="alert" className="text-sm text-destructive">{rejectedStatus ? fill(t.sendRejected, { status: rejectedStatus }) : t.sendError}</p>}
       </CardContent>
       <CardFooter>
-        <Button size="lg" className="w-full sm:w-auto" disabled={sending || otherMissing} onClick={() => onSubmit(GENRE_ORDER.filter((g) => genres.includes(g)).join(", "), other.trim())}>{sending ? t.sending : t.submit}</Button>
+        <Button size="lg" className="w-full sm:w-auto" disabled={sending || (!rejectedStatus && otherMissing)} onClick={() => rejectedStatus ? onReload?.() : onSubmit(GENRE_ORDER.filter((g) => genres.includes(g)).join(", "), other.trim())}>{sending ? t.sending : rejectedStatus ? t.reload : t.submit}</Button>
       </CardFooter>
     </Card>
   )
