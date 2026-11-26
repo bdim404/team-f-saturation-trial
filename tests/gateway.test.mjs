@@ -39,6 +39,14 @@ test('gateway rejects redirects and unsafe cookie scope; failures never retry',a
  assert.equal((await gateway(req('protocol/'),env,async()=>new Response(null,{status:302,headers:{Location:'https://other.example'}}))).status,502)
  let calls=0;assert.equal((await gateway(req('protocol/'),env,async()=>{calls++;throw new Error('private diagnostic')})).status,502);assert.equal(calls,1)
 })
+test('gateway passes the upstream deletion of a stale session cookie as HttpOnly',async()=>{
+ const expired='__Host-mpc_api_session=""; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/; SameSite=Lax; Secure'
+ const response=await gateway(req('bootstrap/',{headers:{Cookie:'__Host-mpc_api_session=stale'}}),env,async()=>new Response('{"error":"Open the local test notice first."}',{status:403,headers:{'Content-Type':'application/json','Set-Cookie':expired}}))
+ assert.equal(response.status,403)
+ assert.deepEqual(response.headers.getSetCookie(),[expired+'; HttpOnly'])
+ const insecure='__Host-mpc_api_session=""; Max-Age=0; Path=/; SameSite=Lax'
+ assert.equal((await gateway(req('bootstrap/'),env,async()=>new Response('{}',{status:403,headers:{'Set-Cookie':insecure}}))).status,502)
+})
 test('gateway preserves export disposition and rate-limit signal without unrelated cookies',async()=>{
  const response=await gateway(req('export/csv/',{method:'POST',headers:{Origin:origin}}),env,async()=>new Response('csv',{status:429,headers:{'Content-Disposition':'attachment; filename="receipt.csv"','Retry-After':'60','Set-Cookie':'unrelated=x; Path=/; Secure'}}))
  assert.equal(response.status,429);assert.equal(response.headers.get('Retry-After'),'60');assert.match(response.headers.get('Content-Disposition'),/receipt.csv/);assert.equal(response.headers.get('Set-Cookie'),null)

@@ -54,9 +54,10 @@ export async function gateway(request, env, send = fetch) {
       if (value !== null) output.set(name, value)
     }
     const setCookies = typeof upstream.headers.getSetCookie === 'function' ? upstream.headers.getSetCookie() : upstream.headers.getAll('Set-Cookie')
-    for (const cookie of setCookies) {
+    for (let cookie of setCookies) {
       if (!COOKIES.has(cookie.slice(0, cookie.indexOf('=')))) continue
       // Preserve host-only Secure Lax cookies under the frontend's own origin.
+      if (cookie.startsWith('__Host-mpc_api_session=') && !/;\s*HttpOnly(?:;|$)/i.test(cookie) && /;\s*Max-Age=0(?:;|$)/i.test(cookie)) cookie += '; HttpOnly'
       if ((cookie.startsWith('__Host-mpc_api_session=') && !/;\s*HttpOnly(?:;|$)/i.test(cookie)) || /;\s*Domain=/i.test(cookie) || !/;\s*Secure(?:;|$)/i.test(cookie) || !/;\s*Path=\/(?:;|$)/i.test(cookie) || !/;\s*SameSite=Lax(?:;|$)/i.test(cookie)) return failure(502)
       output.append('Set-Cookie', cookie)
     }
