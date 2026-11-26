@@ -258,3 +258,30 @@ test('a question mounted while hidden accrues no time before its first visible e
   assert.equal(result.timings.why.changes, 1)
   assert.equal(result.answers.why, undefined)
 })
+test('a second tab sees an in-progress tab and stops seeing it once that tab finishes or closes', async () => {
+  const { TabGuard } = await load('tab-guard')
+  const channels = [new BroadcastChannel('tab-guard-test'), new BroadcastChannel('tab-guard-test')]
+  const first = new TabGuard(channels[0]), second = new TabGuard(channels[1])
+  assert.equal(await second.elsewhere(100), false)
+  first.hold(true)
+  assert.equal(await second.elsewhere(100), true)
+  assert.equal(await first.elsewhere(100), false)
+  first.hold(false)
+  assert.equal(await second.elsewhere(100), false)
+  first.hold(true); channels[0].close()
+  assert.equal(await second.elsewhere(100), false)
+  channels[1].close()
+  assert.equal(await new TabGuard(null).elsewhere(), false)
+})
+test('playback switches the iOS audio session to playback so the silent switch does not mute it', () => {
+  const session = { type: 'auto' }
+  Object.defineProperty(globalThis.navigator, 'audioSession', { value: session, configurable: true })
+  try {
+    const node = () => ({ gain: { value: 0 }, connect: next => next, start() {} })
+    const slot = { buf: {}, gain: 1 }
+    const player = new Player({ duration: 10, slots: { A: slot, B: slot, C: slot }, map: {} })
+    player.ctx = { currentTime: 0, destination: {}, resume: async () => {}, createGain: node, createBufferSource: node }
+    player.play()
+    assert.equal(session.type, 'playback'); assert.equal(player.playing, true)
+  } finally { delete globalThis.navigator.audioSession }
+})

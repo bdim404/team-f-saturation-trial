@@ -7,6 +7,7 @@ import { Trial } from "@/components/study/Trial"
 import { Button } from "@/components/ui/button"
 import { StudyAPI, deploymentOrigin, rejectedSubmissionStatus, type Notice } from "@/lib/study-api"
 import { canRestartTest, newTestLabel } from "@/lib/staging"
+import { TabGuard } from "@/lib/tab-guard"
 import { Measurements, type Measure } from "@/lib/study-measurements"
 import { BUNDLE_REVISION, questionIds } from "@/lib/study-bundle"
 import type { Instrument } from "@/lib/study-model"
@@ -36,6 +37,8 @@ export default function App() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [starting, setStarting] = useState(false)
   const [entryFailed, setEntryFailed] = useState(false)
+  const [guard] = useState(() => new TabGuard())
+  const [elsewhere, setElsewhere] = useState(false)
   const [receiptFailed, setReceiptFailed] = useState(false)
   const [deleted, setDeleted] = useState(false)
   const instrument = useRef<Instrument | null>(null)
@@ -71,6 +74,10 @@ export default function App() {
   }
 
   useEffect(() => {
+    guard.hold(step.kind !== "welcome" && step.kind !== "done")
+  }, [guard, step.kind])
+
+  useEffect(() => {
     document.documentElement.lang = lang
     document.title = t.title
   }, [lang, t.title])
@@ -103,6 +110,8 @@ export default function App() {
       const value = await api.notice(lang, release)
       if (!value.synthetic_only || value.turnstile) throw new Error('Unsupported collection configuration.')
       if (!cancelled) setNotice(value)
+      const busy = await guard.elsewhere()
+      if (!cancelled) setElsewhere(busy)
     }
     prepare().catch(() => !cancelled && setEntryFailed(true))
     return () => { cancelled = true }
@@ -130,6 +139,9 @@ export default function App() {
     if (starting || (api && (!notice || notice.language !== lang))) return
     setStarting(true); setEntryFailed(false)
     try {
+      const busy = await guard.elsewhere()
+      setElsewhere(busy)
+      if (busy) return
       if (api && notice) {
         await api.start(notice, '')
         const value = await api.protocol()
@@ -197,6 +209,7 @@ export default function App() {
           notice={notice}
           busy={starting}
           failed={entryFailed}
+          elsewhere={elsewhere}
           ready={(!api && import.meta.env.DEV) || !!notice}
           onStart={start}
         />

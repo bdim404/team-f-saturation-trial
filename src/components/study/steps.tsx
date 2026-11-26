@@ -122,7 +122,7 @@ export function CheckGroup<T extends string>({ id, label, labelledBy, value, opt
   )
 }
 
-export function Welcome({ t, onStart, notice, busy, failed, ready = true }: { t: Messages; onStart: () => void; notice?: Notice | null; busy?: boolean; failed?: boolean; ready?: boolean }) {
+export function Welcome({ t, onStart, notice, busy, failed, elsewhere, ready = true }: { t: Messages; onStart: () => void; notice?: Notice | null; busy?: boolean; failed?: boolean; elsewhere?: boolean; ready?: boolean }) {
   const [agreed, setAgreed] = useState(false)
   return (
     <Card>
@@ -141,6 +141,7 @@ export function Welcome({ t, onStart, notice, busy, failed, ready = true }: { t:
           <p className="text-muted-foreground">{t.privacy}{notice && " " + notice.notice.paragraphs.join(" ")}</p>
         </Section>
         {failed && <p role="alert" className="text-sm text-destructive">{t.entryError}</p>}
+        {elsewhere && !failed && <p role="alert" className="text-sm text-destructive">{t.otherTab}</p>}
         <Separator />
         <Label htmlFor="consent" className="flex cursor-pointer items-start gap-3 text-base leading-snug font-normal">
           <Checkbox id="consent" checked={agreed} onCheckedChange={(v) => setAgreed(v === true)} className="mt-0.5" />
