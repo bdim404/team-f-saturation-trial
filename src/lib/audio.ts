@@ -272,6 +272,8 @@ export class Player {
 
   play() {
     if (this.playing) return
+    const session = (globalThis.navigator as { audioSession?: { type: string } } | undefined)?.audioSession
+    if (session && session.type !== "playback") session.type = "playback"
     if (!this.ctx) this.ctx = new AudioContext()
     const ctx = this.ctx
     void ctx.resume()
